@@ -59,7 +59,7 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				m.TokenLifetime = duration
 			case "sign_key":
-				m.SignKey = []byte(arg)
+				m.SignKey = arg
 			case "user_db_path":
 				m.UserDBPath = arg
 			case "token_issuer":

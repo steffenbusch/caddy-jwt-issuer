@@ -16,6 +16,7 @@ package jwtissuer
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,14 +25,18 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // JWTIssuer implements an HTTP handler that issues JWTs after authentication.
 type JWTIssuer struct {
-	// SignKey is the secret key used to sign the JWTs.
-	SignKey []byte
+	// SignKey is the base64 encoded secret key used to sign the JWTs.
+	SignKey string
+
+	// signKeyBytes is the base64 decoded secret key used to sign the JWTs.
+	signKeyBytes []byte
 
 	// Path to the user database file with username, password, and audience information
 	UserDBPath string
@@ -75,6 +80,13 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 			zap.Error(err),
 		)
 		return err // Return the error to prevent the server from starting
+	}
+
+	var err error
+	m.signKeyBytes, err = base64.StdEncoding.DecodeString(string(m.SignKey))
+	if err != nil {
+		m.logger.Error("Failed to decode sign key", zap.Error(err))
+		return err
 	}
 
 	return nil
@@ -206,13 +218,15 @@ func logJWTDetails(m *JWTIssuer, user user, tokenString string, token *jwt.Token
 func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
 	claims := jwt.MapClaims{
 		"sub": user.Username,
-		"aud": user.Audience,
-		"iss": m.TokenIssuer,
+		"iss": m.TokenIssuer,    // Issuer (used by issuer_whitelist )
+		"aud": user.Audience,    // Audience (used by audience_whitelist)
+		"jti": uuid.NewString(), // JWT ID
 		"iat": time.Now().Unix(),
+		"nbf": time.Now().Unix(),
 		"exp": time.Now().Add(m.TokenLifetime).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(m.SignKey)
+	tokenString, err := token.SignedString(m.signKeyBytes)
 	return tokenString, token, err
 }
 
