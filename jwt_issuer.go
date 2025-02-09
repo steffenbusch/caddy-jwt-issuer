@@ -30,7 +30,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// JWTIssuer implements an HTTP handler that issues JWTs after authentication.
+// JWTIssuer is a Caddy module that issues JSON Web Tokens (JWT) after username
+// and password authentication. It is intended to generate JWTs that are checked
+// with https://github.com/ggicci/caddy-jwt, which provides the JWT Authentication.
 type JWTIssuer struct {
 	// SignKey is the base64 encoded secret key used to sign the JWTs.
 	SignKey string
