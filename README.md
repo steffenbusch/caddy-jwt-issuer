@@ -86,19 +86,19 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
 ```json
 {
    "bob": {
-     "Password": "$2a$14$SL41zi5LqFYnjIs/U0lX4ewZsrr8aipeCDivi02ccgwdhb/9LahxG",
-     "Audience": [
+     "password": "$2a$14$SL41zi5LqFYnjIs/U0lX4ewZsrr8aipeCDivi02ccgwdhb/9LahxG",
+     "audience": [
        "api-endpoint-1"
      ],
-     "Comment": "Password is Tschigerillo"
+     "comment": "Password is Tschigerillo"
    },
    "alice": {
-     "Password": "$2a$14$d3PG6.orP1Q.0nJ5aLGcEeGui2Zc5TPcq4maq/OjQ2khAeVi4YNTa",
-     "Audience": [
+     "password": "$2a$14$d3PG6.orP1Q.0nJ5aLGcEeGui2Zc5TPcq4maq/OjQ2khAeVi4YNTa",
+     "audience": [
        "api-endpoint-1",
        "admin-endpoint"
      ],
-     "Comment": "Password is password2"
+     "comment": "For security, do not use plaintext passwords in comments as demonstrated above."
    }
 }
 ```
