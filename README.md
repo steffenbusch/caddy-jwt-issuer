@@ -86,14 +86,14 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
 ```json
 {
    "bob": {
-     "Password": "$2a$10$zWflCXjV8rsNhYvUgqz/H.v9MqJXDvbPGg1X2NbUlQ1Z4GWsHAWRO",
+     "Password": "$2a$14$SL41zi5LqFYnjIs/U0lX4ewZsrr8aipeCDivi02ccgwdhb/9LahxG",
      "Audience": [
        "api-endpoint-1"
      ],
-     "Comment": "Password is password1"
+     "Comment": "Password is Tschigerillo"
    },
    "alice": {
-     "Password": "$2a$12$b/bs/W9GPWcw67IyeOnzcOhtic58Ss4zcmzwImHF.W3iNdT7pKiDS",
+     "Password": "$2a$14$d3PG6.orP1Q.0nJ5aLGcEeGui2Zc5TPcq4maq/OjQ2khAeVi4YNTa",
      "Audience": [
        "api-endpoint-1",
        "admin-endpoint"
@@ -117,7 +117,7 @@ with `Content-Type` of `application/json` and the POST data of the credentials. 
 ```bash
 curl -X POST http://localhost:8080/login \
      -H "Content-Type: application/json" \
-     -d '{"username": "bob", "password": "password1"}'
+     -d '{"username": "bob", "password": "Tschigerillo"}'
 {"message":"Success","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiYXBpLWVuZHBvaW50LTEiXSwiZXhwIjoxNzM5MTEzODcyLCJpYXQiOjE3MzkxMTAyNzIsImlzcyI6Imh0dHBzOi8vand0LmV4YW1wbGUuY29tIiwianRpIjoiNzMyZjk0ZGEtYTQyYS00MDJkLTgzNzctMjYwY2MzYzRjN2ZlIiwibmJmIjoxNzM5MTEwMjcyLCJzdWIiOiJib2IifQ._FRER6YwUTSUXXyfpEvgb_1NRejfBQT_EIFDBGUMEx4"}
 ```
 
