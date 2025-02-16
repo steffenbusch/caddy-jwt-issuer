@@ -18,15 +18,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 )
 
-// user struct to hold username, password, and audience information
+// user struct to hold username, password, audience, and token lifetime information
 type user struct {
-	Username string
-	Password string
-	Audience []string
+	Username      string
+	Password      string
+	Audience      []string
+	TokenLifetime *time.Duration
 }
 
 type credentials struct {
@@ -68,7 +70,11 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 	m.users = make(map[string]user)
 
 	// Temporary map to hold the data from the JSON file
-	tempUsers := make(map[string]user)
+	tempUsers := make(map[string]struct {
+		Password      string   `json:"password"`
+		Audience      []string `json:"audience"`
+		TokenLifetime *string  `json:"token_lifetime"`
+	})
 
 	if err := json.Unmarshal(file, &tempUsers); err != nil {
 		return err
@@ -76,8 +82,20 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 
 	// Populate the users map and set the Username field
 	for username, userData := range tempUsers {
-		userData.Username = username
-		m.users[username] = userData
+		var tokenLifetime *time.Duration
+		if userData.TokenLifetime != nil {
+			duration, err := time.ParseDuration(*userData.TokenLifetime)
+			if err != nil {
+				return fmt.Errorf("invalid token lifetime format for user %s: %v", username, err)
+			}
+			tokenLifetime = &duration
+		}
+		m.users[username] = user{
+			Username:      username,
+			Password:      userData.Password,
+			Audience:      userData.Audience,
+			TokenLifetime: tokenLifetime,
+		}
 	}
 
 	m.logger.Info("Loaded users from user database",
