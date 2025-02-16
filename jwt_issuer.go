@@ -117,9 +117,14 @@ func (m *JWTIssuer) Validate() error {
 		return fmt.Errorf("token issuer is required")
 	}
 
+	// Apply a default value of 15 minutes if the default token lifetime is not set
+	if m.DefaultTokenLifetime == 0 {
+		m.DefaultTokenLifetime = 15 * time.Minute
+	}
+
 	// Ensure the token lifetime is reasonable; for example, it should be positive
 	if m.DefaultTokenLifetime <= 0 {
-		return fmt.Errorf("token lifetime must be a positive duration")
+		return fmt.Errorf("default token lifetime must be a positive duration")
 	}
 	return nil
 }

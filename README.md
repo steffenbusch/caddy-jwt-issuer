@@ -10,7 +10,7 @@ It is intended to generate JWTs that are checked with <https://github.com/ggicci
 This plugin provides the following features:
 
 - **JWT Issuance**: Issues JWTs after successful username and password authentication. The issued JWT will include the Audience elements retrieved from the users database.
-- **Configurable Token Lifetime**: Allows setting the lifetime of the issued JWTs.
+- **Configurable Token Lifetime**: Allows setting the default lifetime of the issued JWTs. Each user can have their own individual token lifetime configured in the user database. If not, the default token lifetime from the plugin configuration is used.
 - **User Database**: Supports loading user credentials from a specified JSON file.
 - **HS256 Signing**: Generates JWTs with the symmetric signing algorithm HS256.
 - **Structured Logging**: Provides detailed logging for authentication attempts and token issuance. The emitted logs can be used with `fail2ban` or similar tools to block repeated failed attempts.
@@ -34,7 +34,7 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
             sign_key <base64-encoded-sign-key>
             user_db_path <path-to-user-db>
             token_issuer <issuer-name>
-            token_lifetime <duration>
+            default_token_lifetime <duration>
         }
     }
 }
@@ -45,7 +45,7 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
 - `sign_key`: The base64-encoded secret key used to sign the JWTs.
 - `user_db_path`: The path to the user database JSON file containing username, password, and audience information. See the [example](#sample-usersjson) at the end of this README.
 - `token_issuer`: The issuer name to be included in the JWTs.
-- `token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour).
+- `default_token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour). If not configured, the default value is 15 minutes.
 
 ### Example: Protecting an API Endpoint
 
@@ -58,7 +58,7 @@ The following example demonstrates how to protect an API endpoint using the cadd
             sign_key {env.JWT_SIGN_KEY}
             user_db_path /path/to/user_db.json
             token_issuer https://jwt.example.com
-            token_lifetime 1h
+            default_token_lifetime 1h
         }
     }
 
@@ -90,6 +90,7 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
      "audience": [
        "api-endpoint-1"
      ],
+     "token_lifetime": "1h",
      "comment": "Password is Tschigerillo"
    },
    "alice": {
