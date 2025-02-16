@@ -58,7 +58,7 @@ The following example demonstrates how to protect an API endpoint using the cadd
             sign_key {env.JWT_SIGN_KEY}
             user_db_path /path/to/user_db.json
             token_issuer https://jwt.example.com
-            default_token_lifetime 1h
+            default_token_lifetime 30m
         }
     }
 
@@ -107,8 +107,10 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
 To generate a bcrypt password hash, you can use the `caddy` command itself:
 
 ```bash
-$ caddy hash-password
+caddy hash-password
 ```
+
+If you need to update user information such as adding a new user, updating a password hash, or changing the audience, you can modify the users database file accordingly. After making the changes, reload the Caddy configuration with `--force` to apply the updates.
 
 ### Example: Obtaining a JWT
 
