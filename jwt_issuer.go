@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -96,9 +97,14 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 
 // Validate ensures the configuration is correct.
 func (m *JWTIssuer) Validate() error {
-	// Check if the secret key is set and has an appropriate length
-	if len(m.SignKey) < 32 { // 32 bytes is commonly recommended as a minimum for security
-		return fmt.Errorf("sign key must be at least 32 bytes long")
+	// Check if the base64 encoded sign key is set
+	if m.SignKey == "" {
+		return fmt.Errorf("SignKey must be defined")
+	}
+
+	// Check if the base64 decoded sign key has an appropriate length
+	if len(m.signKeyBytes) < 32 { // 32 bytes is commonly recommended as a minimum for security
+		return fmt.Errorf("decoded sign key must be at least 32 bytes long, check the base64 encoded sign key")
 	}
 
 	// Ensure the user database path is provided
@@ -120,11 +126,8 @@ func (m *JWTIssuer) Validate() error {
 
 // ServeHTTP handles HTTP requests to issue JWT after user authentication.
 func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	// Retrieve the client IP using Caddy's helpers or from the request directly
-	clientIP := getClientIP(r.Context())
-	if clientIP == "" {
-		clientIP = r.RemoteAddr // Fallback to remote address if no contextual IP found
-	}
+	// Retrieve the client IP address from the Caddy context.
+	clientIP := getClientIP(r.Context(), r.RemoteAddr)
 
 	m.logger.Debug("Received JWT issuance request",
 		zap.String("path", r.URL.Path),
@@ -179,7 +182,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return nil
 	}
 
-	// Create the JWT token
+	// Create the JWT
 	tokenString, token, err := m.createJWT(userEntry)
 	if err != nil {
 		m.logger.Error("Failed to create JWT", zap.Error(err), zap.String("username", userEntry.Username))
@@ -195,7 +198,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		logJWTDetails(m, userEntry, tokenString, token)
 	}
 
-	// Send the successful response with the JWT token
+	// Send the successful response with the JWT
 	jsonResponse(w, http.StatusOK, apiResponse{
 		Message: "Success",
 		Token:   tokenString,
@@ -233,14 +236,21 @@ func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
 }
 
 // getClientIP retrieves the client IP address directly from the Caddy context.
-func getClientIP(ctx context.Context) string {
+func getClientIP(ctx context.Context, remoteAddr string) string {
 	clientIP, ok := ctx.Value(caddyhttp.VarsCtxKey).(map[string]any)["client_ip"]
 	if ok {
 		if ip, valid := clientIP.(string); valid {
 			return ip
 		}
 	}
-	return ""
+	// If the client IP is empty, extract it from the request's RemoteAddr.
+	var err error
+	clientIP, _, err = net.SplitHostPort(remoteAddr)
+	if err != nil {
+		// Use the complete RemoteAddr string as a last resort.
+		clientIP = remoteAddr
+	}
+	return clientIP.(string)
 }
 
 // Interface guards to ensure JWTIssuer implements the necessary interfaces.
