@@ -38,6 +38,10 @@ type credentials struct {
 
 // validateUserEntry ensures the user entry is correct.
 func (m *JWTIssuer) validateUserEntry(user user, username, clientIP string) error {
+	// Lock the users map for reading
+	m.usersMutex.RLock()
+	defer m.usersMutex.RUnlock()
+
 	if user.Password == "" {
 		m.logger.Error("User database entry missing password",
 			zap.String("user_database", m.UserDBPath),
@@ -66,9 +70,6 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 		return err
 	}
 
-	// Reinitialize the users map to clear old data
-	m.users = make(map[string]user)
-
 	// Temporary map to hold the data from the JSON file
 	tempUsers := make(map[string]struct {
 		Password      string   `json:"password"`
@@ -79,6 +80,13 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 	if err := json.Unmarshal(file, &tempUsers); err != nil {
 		return err
 	}
+
+	// Lock the users map for writing
+	m.usersMutex.Lock()
+	defer m.usersMutex.Unlock()
+
+	// Reinitialize the users map to clear old data
+	m.users = make(map[string]user)
 
 	// Populate the users map and set the Username field
 	for username, userData := range tempUsers {

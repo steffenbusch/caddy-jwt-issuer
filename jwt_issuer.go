@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -47,6 +48,9 @@ type JWTIssuer struct {
 	// Users map to hold the user database in memory
 	users map[string]user
 
+	// Mutex to protect the users map
+	usersMutex *sync.RWMutex
+
 	// JWT Issuer ("iss")
 	TokenIssuer string
 
@@ -68,6 +72,11 @@ func (JWTIssuer) CaddyModule() caddy.ModuleInfo {
 // Provision sets up the module, initializes the logger, and applies default values.
 func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger()
+
+	// Initialize the mutex if it's nil
+	if m.usersMutex == nil {
+		m.usersMutex = &sync.RWMutex{}
+	}
 
 	// Log the configuration values. Ensure that sensitive data such as keys are not logged
 	m.logger.Info("JWT-Issuer plugin configured",
@@ -168,7 +177,9 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	}
 
 	// Retrieve the user entry from the in-memory user database
+	m.usersMutex.RLock()
 	userEntry, exists := m.users[providedCredentials.Username]
+	m.usersMutex.RUnlock()
 	if !exists {
 		logger.Warn("Authentication failed due to incorrect username",
 			zap.String("username", providedCredentials.Username),
