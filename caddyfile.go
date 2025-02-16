@@ -52,12 +52,12 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				return d.ArgErr()
 			}
 			switch param {
-			case "token_lifetime":
+			case "default_token_lifetime":
 				duration, err := time.ParseDuration(arg)
 				if err != nil {
-					return fmt.Errorf("invalid token_lifetime duration: %s", err)
+					return fmt.Errorf("invalid default_token_lifetime duration: %s", err)
 				}
-				m.TokenLifetime = duration
+				m.DefaultTokenLifetime = duration
 			case "sign_key":
 				m.SignKey = arg
 			case "user_db_path":

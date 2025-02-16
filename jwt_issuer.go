@@ -50,8 +50,8 @@ type JWTIssuer struct {
 	// JWT Issuer ("iss")
 	TokenIssuer string
 
-	// JWT lifetime
-	TokenLifetime time.Duration
+	// Default JWT lifetime unless the user has a specific token lifetime
+	DefaultTokenLifetime time.Duration
 
 	// logger provides structured logging for the module.
 	logger *zap.Logger
@@ -73,7 +73,7 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 	m.logger.Info("JWT-Issuer plugin configured",
 		zap.String("User database path", m.UserDBPath),
 		zap.String("Token issuer", m.TokenIssuer),
-		zap.String("JWT lifetime", m.TokenLifetime.String()),
+		zap.String("Default JWT lifetime", m.DefaultTokenLifetime.String()),
 	)
 
 	// Attempt to load users from the specified database path
@@ -118,7 +118,7 @@ func (m *JWTIssuer) Validate() error {
 	}
 
 	// Ensure the token lifetime is reasonable; for example, it should be positive
-	if m.TokenLifetime <= 0 {
+	if m.DefaultTokenLifetime <= 0 {
 		return fmt.Errorf("token lifetime must be a positive duration")
 	}
 	return nil
@@ -221,6 +221,13 @@ func logJWTDetails(m *JWTIssuer, user user, tokenString string, token *jwt.Token
 }
 
 func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
+	// Determine the token lifetime to use. By default, use the module's token lifetime.
+	tokenLifetime := m.DefaultTokenLifetime
+	// If the user has a specific token lifetime, use that instead
+	if user.TokenLifetime != nil {
+		tokenLifetime = *user.TokenLifetime
+	}
+
 	claims := jwt.MapClaims{
 		"sub": user.Username,
 		"iss": m.TokenIssuer,    // Issuer (used by issuer_whitelist )
@@ -228,7 +235,7 @@ func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
 		"jti": uuid.NewString(), // JWT ID
 		"iat": time.Now().Unix(),
 		"nbf": time.Now().Unix(),
-		"exp": time.Now().Add(m.TokenLifetime).Unix(),
+		"exp": time.Now().Add(tokenLifetime).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(m.signKeyBytes)
