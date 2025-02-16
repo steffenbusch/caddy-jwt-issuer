@@ -113,7 +113,7 @@ func (m *JWTIssuer) Validate() error {
 
 	// Check if the base64 decoded sign key has an appropriate length
 	if len(m.signKeyBytes) < 32 { // 32 bytes is commonly recommended as a minimum for security
-		return fmt.Errorf("decoded sign key must be at least 32 bytes long, check the base64 encoded sign key")
+		return fmt.Errorf("decoded sign key must be at least 32 bytes long, but it is %d bytes long, check the base64 encoded sign key", len(m.signKeyBytes))
 	}
 
 	// Ensure the user database path is provided
