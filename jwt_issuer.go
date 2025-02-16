@@ -216,7 +216,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
 	logger.Debug("Encoded JWT", zap.String("jwt", tokenString))
 
-	// add logging of all claims details such as expiration
+	// Log the JWT claims
 	expirationTime := time.Unix(token.Claims.(jwt.MapClaims)["exp"].(int64), 0)
 	issuedAtTime := time.Unix(token.Claims.(jwt.MapClaims)["iat"].(int64), 0)
 	logger.Info("JWT claims",
