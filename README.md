@@ -43,7 +43,7 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
 ### Configuration Options
 
 - `sign_key`: The base64-encoded secret key used to sign the JWTs.
-- `user_db_path`: The path to the user database JSON file containing username, password, and audience information. See the [example](#sample-usersjson) at the end of this README.
+- `user_db_path`: The path to the user database JSON file containing username, password, audience information, and optional deviating token lifetime. See the [example](#sample-usersjson) at the end of this README.
 - `token_issuer`: The issuer name to be included in the JWTs.
 - `default_token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour). If not configured, the default value is 15 minutes.
 

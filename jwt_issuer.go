@@ -134,15 +134,19 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Retrieve the client IP address from the Caddy context.
 	clientIP := getClientIP(r.Context(), r.RemoteAddr)
 
-	m.logger.Debug("Received JWT issuance request",
+	// Create logger with common fields
+	logger := m.logger.With(
+		zap.String("client_ip", clientIP),
+	)
+
+	logger.Debug("Received JWT issuance request",
 		zap.String("path", r.URL.Path),
 		zap.String("method", r.Method),
-		zap.String("clientIP", clientIP),
 	)
 
 	// Only POST requests are allowed
 	if r.Method != http.MethodPost {
-		m.logger.Warn("Non-POST method attempted", zap.String("method", r.Method), zap.String("clientIP", clientIP))
+		logger.Warn("Non-POST method attempted", zap.String("method", r.Method))
 		w.Header().Set("Allow", "POST")
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return nil
@@ -151,14 +155,14 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Decode the JSON body into the credentials struct
 	var providedCredentials credentials
 	if err := json.NewDecoder(r.Body).Decode(&providedCredentials); err != nil {
-		m.logger.Error("Error decoding credentials", zap.Error(err), zap.String("clientIP", clientIP))
+		logger.Error("Error decoding credentials", zap.Error(err))
 		jsonError(w, http.StatusBadRequest, "Invalid request payload.")
 		return nil
 	}
 
 	// Check if username was provided
 	if providedCredentials.Username == "" {
-		m.logger.Error("No username provided", zap.String("clientIP", clientIP))
+		logger.Error("No username provided")
 		jsonError(w, http.StatusBadRequest, "Missing username value")
 		return nil
 	}
@@ -166,9 +170,8 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Retrieve the user entry from the in-memory user database
 	userEntry, exists := m.users[providedCredentials.Username]
 	if !exists {
-		m.logger.Warn("Authentication failed due to incorrect username",
+		logger.Warn("Authentication failed due to incorrect username",
 			zap.String("username", providedCredentials.Username),
-			zap.String("clientIP", clientIP),
 		)
 		jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
 		return nil
@@ -182,26 +185,25 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 
 	// Verify the provided password against the stored hash
 	if bcrypt.CompareHashAndPassword([]byte(userEntry.Password), []byte(providedCredentials.Password)) != nil {
-		m.logger.Warn("Authentication failed due to wrong password", zap.String("username", providedCredentials.Username), zap.String("clientIP", clientIP))
+		logger.Warn("Authentication failed due to wrong password", zap.String("username", providedCredentials.Username))
 		jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
 		return nil
 	}
 
 	// Create the JWT
 	tokenString, token, err := m.createJWT(userEntry)
+	logger = logger.With(zap.String("username", userEntry.Username))
 	if err != nil {
-		m.logger.Error("Failed to create JWT", zap.Error(err), zap.String("username", userEntry.Username))
+		logger.Error("Failed to create JWT", zap.Error(err))
 		jsonError(w, http.StatusInternalServerError, "Internal server error")
 		return nil
 	}
 
 	// Log successful JWT issuance
-	m.logger.Info("Successfully issued JWT for user", zap.String("username", userEntry.Username), zap.String("clientIP", clientIP))
+	logger.Info("Successfully issued JWT for user")
 
-	// Log JWT details if debug level is enabled
-	if m.logger.Core().Enabled(zap.DebugLevel) {
-		logJWTDetails(m, userEntry, tokenString, token)
-	}
+	// Log JWT details
+	logJWTDetails(logger, tokenString, token)
 
 	// Send the successful response with the JWT
 	jsonResponse(w, http.StatusOK, apiResponse{
@@ -211,18 +213,20 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	return nil
 }
 
-func logJWTDetails(m *JWTIssuer, user user, tokenString string, token *jwt.Token) {
-	m.logger.Debug("Encoded JWT", zap.String("username", user.Username), zap.String("jwt", tokenString))
+func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
+	logger.Debug("Encoded JWT", zap.String("jwt", tokenString))
 
-	headerJSON, err := json.Marshal(token.Header)
-	if err == nil {
-		m.logger.Debug("Decoded JWT header", zap.String("username", user.Username), zap.ByteString("header", headerJSON))
-	}
-
-	claimsJSON, err := json.Marshal(token.Claims)
-	if err == nil {
-		m.logger.Debug("Decoded JWT claims", zap.String("username", user.Username), zap.ByteString("claims", claimsJSON))
-	}
+	// add logging of all claims details such as expiration
+	expirationTime := time.Unix(token.Claims.(jwt.MapClaims)["exp"].(int64), 0)
+	issuedAtTime := time.Unix(token.Claims.(jwt.MapClaims)["iat"].(int64), 0)
+	logger.Info("JWT claims",
+		zap.String("Subject", token.Claims.(jwt.MapClaims)["sub"].(string)),
+		zap.String("Issuer", token.Claims.(jwt.MapClaims)["iss"].(string)),
+		zap.Strings("Audience", token.Claims.(jwt.MapClaims)["aud"].([]string)),
+		zap.String("JWT ID", token.Claims.(jwt.MapClaims)["jti"].(string)),
+		zap.Time("Issued at", issuedAtTime),
+		zap.Time("Expiration time", expirationTime),
+	)
 }
 
 func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
