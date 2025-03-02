@@ -64,6 +64,8 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				m.UserDBPath = arg
 			case "token_issuer":
 				m.TokenIssuer = arg
+			case "cookie_domain":
+				m.CookieDomain = arg
 			default:
 				return d.Errf("unknown subdirective: %s", param)
 			}
