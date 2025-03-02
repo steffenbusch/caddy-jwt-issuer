@@ -181,6 +181,11 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	userEntry, exists := m.users[providedCredentials.Username]
 	m.usersMutex.RUnlock()
 	if !exists {
+		// Use a fake hash to prevent timing attacks
+		// The cost of 14 is chosen to match the bcrypt cost used for real passwords
+		// This prevents attackers from knowing if a user does not exist based on the time taken
+		fakeHash := "$2a$14$BS8pSBcO76nFFFvzQuZuPe5nahDaA2QkXaUnUp4ND6k1ax4Ohi39m"
+		bcrypt.CompareHashAndPassword([]byte(fakeHash), []byte(providedCredentials.Password))
 		logger.Warn("Authentication failed due to incorrect username",
 			zap.String("username", providedCredentials.Username),
 		)
