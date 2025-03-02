@@ -57,6 +57,9 @@ type JWTIssuer struct {
 	// Default JWT lifetime unless the user has a specific token lifetime
 	DefaultTokenLifetime time.Duration
 
+	// CookieDomain is the domain for which the JWT cookie is set.
+	CookieDomain string
+
 	// logger provides structured logging for the module.
 	logger *zap.Logger
 }
@@ -215,6 +218,20 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 
 	// Log JWT details
 	logJWTDetails(logger, tokenString, token)
+
+	// Check if the cookie query parameter is present
+	if r.URL.Query().Has("cookie") {
+		// Set the JWT as a cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "jwt_token",
+			Value:    tokenString,
+			Path:     "/",
+			Domain:   m.CookieDomain,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
+		})
+	}
 
 	// Send the successful response with the JWT
 	jsonResponse(w, http.StatusOK, apiResponse{
