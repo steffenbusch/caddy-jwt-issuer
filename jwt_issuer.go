@@ -37,13 +37,13 @@ import (
 // with https://github.com/ggicci/caddy-jwt, which provides the JWT Authentication.
 type JWTIssuer struct {
 	// SignKey is the base64 encoded secret key used to sign the JWTs.
-	SignKey string
+	SignKey string `json:"sign_key,omitempty"`
 
 	// signKeyBytes is the base64 decoded secret key used to sign the JWTs.
 	signKeyBytes []byte
 
 	// Path to the user database file with username, password, and audience information
-	UserDBPath string
+	UserDBPath string `json:"user_db_path,omitempty"`
 
 	// Users map to hold the user database in memory
 	users map[string]user
@@ -52,10 +52,10 @@ type JWTIssuer struct {
 	usersMutex *sync.RWMutex
 
 	// JWT Issuer ("iss")
-	TokenIssuer string
+	TokenIssuer string `json:"token_issuer,omitempty"`
 
 	// Default JWT lifetime unless the user has a specific token lifetime
-	DefaultTokenLifetime time.Duration
+	DefaultTokenLifetime time.Duration `json:"default_token_lifetime,omitempty"`
 
 	// logger provides structured logging for the module.
 	logger *zap.Logger
