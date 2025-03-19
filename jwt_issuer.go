@@ -209,8 +209,25 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return nil
 	}
 
+	// Check if TOTP is required for the user
+	if userEntry.TOTPSecret != "" {
+		if providedCredentials.TOTP == "" {
+			logger.Warn("TOTP code missing for user", zap.String("username", providedCredentials.Username))
+			jsonError(w, http.StatusUnauthorized, "Unauthorized: Missing TOTP code")
+			return nil
+		}
+
+		// Placeholder for TOTP verification logic
+		// TODO: Implement real TOTP verification
+		if providedCredentials.TOTP != "123456" { // currently hardcoded to 123456
+			logger.Warn("Invalid TOTP code provided", zap.String("username", providedCredentials.Username))
+			jsonError(w, http.StatusUnauthorized, "Unauthorized: Invalid TOTP code")
+			return nil
+		}
+	}
+
 	// Create the JWT
-	tokenString, token, err := m.createJWT(userEntry)
+	tokenString, token, err := m.createJWT(userEntry, clientIP)
 	logger = logger.With(zap.String("username", userEntry.Username))
 	if err != nil {
 		logger.Error("Failed to create JWT", zap.Error(err))
@@ -236,6 +253,9 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 			Secure:   true,
 			SameSite: http.SameSiteStrictMode,
 		})
+		// send redirect to a configurable URL
+		http.Redirect(w, r, "/portal.html", http.StatusFound)
+		return nil
 	}
 
 	// Send the successful response with the JWT
@@ -262,7 +282,7 @@ func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
 	)
 }
 
-func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
+func (m *JWTIssuer) createJWT(user user, clientIP string) (string, *jwt.Token, error) {
 	// Determine the token lifetime to use. By default, use the module's token lifetime.
 	tokenLifetime := m.DefaultTokenLifetime
 	// If the user has a specific token lifetime, use that instead
@@ -271,13 +291,14 @@ func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
 	}
 
 	claims := jwt.MapClaims{
-		"sub": user.Username,
-		"iss": m.TokenIssuer,    // Issuer (used by issuer_whitelist )
-		"aud": user.Audience,    // Audience (used by audience_whitelist)
-		"jti": uuid.NewString(), // JWT ID
-		"iat": time.Now().Unix(),
-		"nbf": time.Now().Unix(),
-		"exp": time.Now().Add(tokenLifetime).Unix(),
+		"sub":        user.Username,
+		"iss":        m.TokenIssuer,    // Issuer (used by issuer_whitelist )
+		"aud":        user.Audience,    // Audience (used by audience_whitelist)
+		"jti":        uuid.NewString(), // JWT ID
+		"iat":        time.Now().Unix(),
+		"nbf":        time.Now().Unix(),
+		"exp":        time.Now().Add(tokenLifetime).Unix(),
+		"client_ip ": clientIP, // Include client IP as a claim
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(m.signKeyBytes)

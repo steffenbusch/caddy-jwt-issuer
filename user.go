@@ -29,11 +29,13 @@ type user struct {
 	Password      string
 	Audience      []string
 	TokenLifetime *time.Duration
+	TOTPSecret    string
 }
 
 type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	TOTP     string `json:"totp,omitempty"`
 }
 
 // validateUserEntry ensures the user entry is correct.
@@ -75,6 +77,7 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 		Password      string   `json:"password"`
 		Audience      []string `json:"audience"`
 		TokenLifetime *string  `json:"token_lifetime"`
+		TOTPSecret    string   `json:"totp_secret"`
 	})
 
 	if err := json.Unmarshal(file, &tempUsers); err != nil {
@@ -103,6 +106,7 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 			Password:      userData.Password,
 			Audience:      userData.Audience,
 			TokenLifetime: tokenLifetime,
+			TOTPSecret:    userData.TOTPSecret,
 		}
 	}
 
