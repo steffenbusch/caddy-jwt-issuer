@@ -26,8 +26,6 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -264,65 +262,6 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		Token:   tokenString,
 	})
 	return nil
-}
-
-func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
-	logger.Debug("Encoded JWT", zap.String("jwt", tokenString))
-
-	// Log the JWT claims
-	expirationTime := time.Unix(token.Claims.(jwt.MapClaims)["exp"].(int64), 0)
-	issuedAtTime := time.Unix(token.Claims.(jwt.MapClaims)["iat"].(int64), 0)
-	logger.Info("JWT claims",
-		zap.String("Subject", token.Claims.(jwt.MapClaims)["sub"].(string)),
-		zap.String("Issuer", token.Claims.(jwt.MapClaims)["iss"].(string)),
-		zap.Strings("Audience", token.Claims.(jwt.MapClaims)["aud"].([]string)),
-		zap.String("JWT ID", token.Claims.(jwt.MapClaims)["jti"].(string)),
-		zap.Time("Issued at", issuedAtTime),
-		zap.Time("Expiration time", expirationTime),
-	)
-}
-
-func (m *JWTIssuer) createJWT(user user, clientIP string) (string, *jwt.Token, error) {
-	// Determine the token lifetime to use. By default, use the module's token lifetime.
-	tokenLifetime := m.DefaultTokenLifetime
-	// If the user has a specific token lifetime, use that instead
-	if user.TokenLifetime != nil {
-		tokenLifetime = *user.TokenLifetime
-	}
-
-	// Predefined claims that cannot be overridden
-	predefinedClaims := map[string]bool{
-		"sub":        true,
-		"iss":        true,
-		"aud":        true,
-		"jti":        true,
-		"iat":        true,
-		"nbf":        true,
-		"exp":        true,
-		"client_ip ": true,
-	}
-
-	claims := jwt.MapClaims{
-		"sub":        user.Username,
-		"iss":        m.TokenIssuer,    // Issuer (used by issuer_whitelist )
-		"aud":        user.Audience,    // Audience (used by audience_whitelist)
-		"jti":        uuid.NewString(), // JWT ID
-		"iat":        time.Now().Unix(),
-		"nbf":        time.Now().Unix(),
-		"exp":        time.Now().Add(tokenLifetime).Unix(),
-		"client_ip ": clientIP, // Include client IP as a claim
-	}
-
-	// Add meta_claims to the JWT claims, excluding predefined claims
-	for key, value := range user.MetaClaims {
-		if !predefinedClaims[key] {
-			claims[key] = value
-		}
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(m.signKeyBytes)
-	return tokenString, token, err
 }
 
 // getClientIP retrieves the client IP address directly from the Caddy context.
