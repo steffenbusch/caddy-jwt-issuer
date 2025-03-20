@@ -290,6 +290,18 @@ func (m *JWTIssuer) createJWT(user user, clientIP string) (string, *jwt.Token, e
 		tokenLifetime = *user.TokenLifetime
 	}
 
+	// Predefined claims that cannot be overridden
+	predefinedClaims := map[string]bool{
+		"sub":        true,
+		"iss":        true,
+		"aud":        true,
+		"jti":        true,
+		"iat":        true,
+		"nbf":        true,
+		"exp":        true,
+		"client_ip ": true,
+	}
+
 	claims := jwt.MapClaims{
 		"sub":        user.Username,
 		"iss":        m.TokenIssuer,    // Issuer (used by issuer_whitelist )
@@ -300,6 +312,14 @@ func (m *JWTIssuer) createJWT(user user, clientIP string) (string, *jwt.Token, e
 		"exp":        time.Now().Add(tokenLifetime).Unix(),
 		"client_ip ": clientIP, // Include client IP as a claim
 	}
+
+	// Add meta_claims to the JWT claims, excluding predefined claims
+	for key, value := range user.MetaClaims {
+		if !predefinedClaims[key] {
+			claims[key] = value
+		}
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(m.signKeyBytes)
 	return tokenString, token, err
