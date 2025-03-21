@@ -72,6 +72,7 @@ func (JWTIssuer) CaddyModule() caddy.ModuleInfo {
 // Provision sets up the module, initializes the logger, and applies default values.
 func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger()
+	repl := caddy.NewReplacer()
 
 	// Initialize the mutex if it's nil
 	if m.usersMutex == nil {
@@ -93,6 +94,9 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		)
 		return err // Return the error to prevent the server from starting
 	}
+
+	// Replace placeholders in the SignKey such as {file./path/to/jwt-secret.txt}
+	m.SignKey = repl.ReplaceAll(m.SignKey, "")
 
 	var err error
 	m.signKeyBytes, err = base64.StdEncoding.DecodeString(m.SignKey)

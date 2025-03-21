@@ -43,6 +43,8 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
 ### Configuration Options
 
 - `sign_key`: The base64-encoded secret key used to sign the JWTs.
+  - *Usage Tip*: To create a secure base64-encoded sign key, you can use the command `openssl rand -base64 32`. This command generates a random 32-byte key and encodes it in base64 format.
+  - *Placeholder Support*: You can also use a placeholder to reference a file containing the key, such as `{file./path/to/jwt-secret.txt}`. The file's content will be read and used as the signing key.
 - `user_db_path`: The path to the user database JSON file containing username, password, audience information, and optional deviating token lifetime. See the [example](#sample-usersjson) at the end of this README.
 - `token_issuer`: The issuer name to be included in the JWTs.
 - `default_token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour). If not configured, the default value is 15 minutes.
@@ -55,7 +57,7 @@ The following example demonstrates how to protect an API endpoint using the cadd
 :8080 {
     handle /login {
         jwt_issuer {
-            sign_key {env.JWT_SIGN_KEY}
+            sign_key {file./path/to/jwt-secret.txt}
             user_db_path /path/to/user_db.json
             token_issuer https://jwt.example.com
             default_token_lifetime 30m
@@ -65,7 +67,7 @@ The following example demonstrates how to protect an API endpoint using the cadd
     route /api/* {
         # See https://github.com/ggicci/caddy-jwt
         jwtauth {
-            sign_key {env.JWT_SIGN_KEY}
+            sign_key {$JWT_SIGN_KEY}
             sign_alg HS256
             issuer_whitelist https://jwt.example.com
             audience_whitelist "api-endpoint-1"
