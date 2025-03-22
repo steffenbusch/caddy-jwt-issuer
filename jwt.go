@@ -32,7 +32,7 @@ func predefinedClaims() map[string]bool {
 		"iat": true,
 		"nbf": true,
 		"exp": true,
-		"ip ": true,
+		"ip":  true,
 	}
 }
 
@@ -83,7 +83,7 @@ func (m *JWTIssuer) createJWT(user user, clientIP string) (string, *jwt.Token, e
 		"iat": time.Now().Unix(),
 		"nbf": time.Now().Unix(),
 		"exp": time.Now().Add(tokenLifetime).Unix(),
-		"ip ": clientIP, // Include client IP as a claim
+		"ip":  clientIP, // Include client IP as a claim
 	}
 
 	// Add meta_claims to the JWT claims, excluding predefined claims
