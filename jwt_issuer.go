@@ -26,8 +26,7 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
+	"github.com/pquerna/otp/totp"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -56,6 +55,9 @@ type JWTIssuer struct {
 
 	// Default JWT lifetime unless the user has a specific token lifetime
 	DefaultTokenLifetime time.Duration `json:"default_token_lifetime,omitempty"`
+
+	// CookieDomain is the domain for which the JWT cookie is set.
+	CookieDomain string
 
 	// logger provides structured logging for the module.
 	logger *zap.Logger
@@ -210,8 +212,25 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return nil
 	}
 
+	// Check if TOTP is required for the user
+	if userEntry.TOTPSecret != "" {
+		if providedCredentials.TOTP == "" {
+			logger.Warn("TOTP code missing for user", zap.String("username", providedCredentials.Username))
+			jsonError(w, http.StatusUnauthorized, "Unauthorized: Missing TOTP code")
+			return nil
+		}
+
+		// Validate the TOTP code with the user's secret.
+		// If validation fails, log an invalid TOTP attempt for monitoring tools like fail2ban.
+		if !totp.Validate(providedCredentials.TOTP, userEntry.TOTPSecret) {
+			logger.Warn("Invalid TOTP attempt", zap.String("username", providedCredentials.Username))
+			jsonError(w, http.StatusUnauthorized, "Unauthorized: Invalid TOTP code")
+			return nil
+		}
+	}
+
 	// Create the JWT
-	tokenString, token, err := m.createJWT(userEntry)
+	tokenString, token, err := m.createJWT(userEntry, clientIP)
 	logger = logger.With(zap.String("username", userEntry.Username))
 	if err != nil {
 		logger.Error("Failed to create JWT", zap.Error(err))
@@ -225,50 +244,29 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Log JWT details
 	logJWTDetails(logger, tokenString, token)
 
+	// Check if the cookie query parameter is present
+	if r.URL.Query().Has("cookie") {
+		// Set the JWT as a cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "jwt_token",
+			Value:    tokenString,
+			Path:     "/",
+			Domain:   m.CookieDomain,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
+		})
+		// send redirect to a configurable URL
+		http.Redirect(w, r, "/portal.html", http.StatusFound)
+		return nil
+	}
+
 	// Send the successful response with the JWT
 	jsonResponse(w, http.StatusOK, apiResponse{
 		Message: "Success",
 		Token:   tokenString,
 	})
 	return nil
-}
-
-func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
-	logger.Debug("Encoded JWT", zap.String("jwt", tokenString))
-
-	// Log the JWT claims
-	expirationTime := time.Unix(token.Claims.(jwt.MapClaims)["exp"].(int64), 0)
-	issuedAtTime := time.Unix(token.Claims.(jwt.MapClaims)["iat"].(int64), 0)
-	logger.Info("JWT claims",
-		zap.String("Subject", token.Claims.(jwt.MapClaims)["sub"].(string)),
-		zap.String("Issuer", token.Claims.(jwt.MapClaims)["iss"].(string)),
-		zap.Strings("Audience", token.Claims.(jwt.MapClaims)["aud"].([]string)),
-		zap.String("JWT ID", token.Claims.(jwt.MapClaims)["jti"].(string)),
-		zap.Time("Issued at", issuedAtTime),
-		zap.Time("Expiration time", expirationTime),
-	)
-}
-
-func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
-	// Determine the token lifetime to use. By default, use the module's token lifetime.
-	tokenLifetime := m.DefaultTokenLifetime
-	// If the user has a specific token lifetime, use that instead
-	if user.TokenLifetime != nil {
-		tokenLifetime = *user.TokenLifetime
-	}
-
-	claims := jwt.MapClaims{
-		"sub": user.Username,
-		"iss": m.TokenIssuer,    // Issuer (used by issuer_whitelist )
-		"aud": user.Audience,    // Audience (used by audience_whitelist)
-		"jti": uuid.NewString(), // JWT ID
-		"iat": time.Now().Unix(),
-		"nbf": time.Now().Unix(),
-		"exp": time.Now().Add(tokenLifetime).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(m.signKeyBytes)
-	return tokenString, token, err
 }
 
 // getClientIP retrieves the client IP address directly from the Caddy context.

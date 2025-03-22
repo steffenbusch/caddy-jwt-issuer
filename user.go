@@ -29,11 +29,14 @@ type user struct {
 	Password      string
 	Audience      []string
 	TokenLifetime *time.Duration
+	TOTPSecret    string
+	MetaClaims    map[string]any // Add MetaClaims field
 }
 
 type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	TOTP     string `json:"totp,omitempty"`
 }
 
 // validateUserEntry ensures the user entry is correct.
@@ -72,9 +75,11 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 
 	// Temporary map to hold the data from the JSON file
 	tempUsers := make(map[string]struct {
-		Password      string   `json:"password"`
-		Audience      []string `json:"audience"`
-		TokenLifetime *string  `json:"token_lifetime"`
+		Password      string         `json:"password"`
+		Audience      []string       `json:"audience"`
+		TokenLifetime *string        `json:"token_lifetime"`
+		TOTPSecret    string         `json:"totp_secret"`
+		MetaClaims    map[string]any `json:"meta_claims"`
 	})
 
 	if err := json.Unmarshal(file, &tempUsers); err != nil {
@@ -103,6 +108,8 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 			Password:      userData.Password,
 			Audience:      userData.Audience,
 			TokenLifetime: tokenLifetime,
+			TOTPSecret:    userData.TOTPSecret,
+			MetaClaims:    userData.MetaClaims,
 		}
 	}
 
