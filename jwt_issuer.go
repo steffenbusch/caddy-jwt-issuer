@@ -230,7 +230,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	}
 
 	// Create the JWT
-	tokenString, token, err := m.createJWT(userEntry, clientIP)
+	tokenString, token, err := m.createJWT(userEntry, clientIP, r.Context())
 	logger = logger.With(zap.String("username", userEntry.Username))
 	if err != nil {
 		logger.Error("Failed to create JWT", zap.Error(err))

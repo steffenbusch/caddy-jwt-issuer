@@ -15,8 +15,10 @@
 package jwtissuer
 
 import (
+	"context"
 	"time"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -67,7 +69,7 @@ func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
 	}
 }
 
-func (m *JWTIssuer) createJWT(user user, clientIP string) (string, *jwt.Token, error) {
+func (m *JWTIssuer) createJWT(user user, clientIP string, ctx context.Context) (string, *jwt.Token, error) {
 	// Determine the token lifetime to use. By default, use the module's token lifetime.
 	tokenLifetime := m.DefaultTokenLifetime
 	// If the user has a specific token lifetime, use that instead
@@ -86,9 +88,17 @@ func (m *JWTIssuer) createJWT(user user, clientIP string) (string, *jwt.Token, e
 		"ip":  clientIP, // Include client IP as a claim
 	}
 
+	// Fetch replacer from the request context
+	repl := ctx.Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+
 	// Add meta_claims to the JWT claims, excluding predefined claims
 	for key, value := range user.MetaClaims {
 		if !predefinedClaims()[key] {
+			if strValue, ok := value.(string); ok {
+				// Replace known placeholders in the meta_claim value
+				// unknown placeholders are left as-is
+				value = repl.ReplaceKnown(strValue, "")
+			}
 			claims[key] = value
 		}
 	}
