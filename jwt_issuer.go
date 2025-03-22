@@ -26,6 +26,7 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/pquerna/otp/totp"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -219,10 +220,10 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 			return nil
 		}
 
-		// Placeholder for TOTP verification logic
-		// TODO: Implement real TOTP verification
-		if providedCredentials.TOTP != "123456" { // currently hardcoded to 123456
-			logger.Warn("Invalid TOTP code provided", zap.String("username", providedCredentials.Username))
+		// Validate the TOTP code with the user's secret.
+		// If validation fails, log an invalid TOTP attempt for monitoring tools like fail2ban.
+		if !totp.Validate(providedCredentials.TOTP, userEntry.TOTPSecret) {
+			logger.Warn("Invalid TOTP attempt", zap.String("username", providedCredentials.Username))
 			jsonError(w, http.StatusUnauthorized, "Unauthorized: Invalid TOTP code")
 			return nil
 		}
