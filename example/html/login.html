@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login-Page Prototype with JSON Handling</title>
+    <title>Login-Page</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -102,7 +102,6 @@
             .then(response => {
                 if (response.redirected) {
                     // Follow the redirect if the server sends one
-                    // UNTESTED: This may not work as expected
                     window.location.href = response.url;
                 } else {
                     return response.json();
@@ -113,17 +112,19 @@
                     const messageElement = document.getElementById("message");
                     if (data.message === "Success") {
                         messageElement.textContent = "Login successful!";
-                        messageElement.className = "success"; // Assign success class
+                        messageElement.className = "success";
+                        // or redirect here to a custom portal or whoami page
+                        // window.location.href = "/portal.html";
                     } else {
                         messageElement.textContent = data.message;
-                        messageElement.className = "error"; // Assign error class
+                        messageElement.className = "error";
                     }
                 }
             })
             .catch(error => {
                 const messageElement = document.getElementById("message");
                 messageElement.textContent = "Error: " + error;
-                messageElement.className = "error"; // Assign error class
+                messageElement.className = "error";
                 console.error("Error:", error);
             });
         });

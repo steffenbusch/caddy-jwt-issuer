@@ -1,0 +1,119 @@
+{
+	debug
+	email example@example.com
+	order jwtauth before basic_auth
+}
+
+auth.example.com {
+	# redirect all other requests to login.html
+	handle * {
+		route {
+			error /favicon.ico 404
+			# Convenience redirects
+			redir /portal /portal.html
+			redir /logout /logout.html
+			# Other, unspecified requests go to login.html
+			redir * /login.html
+		}
+	}
+
+	# Login-Endpoint with JWT-Issuer
+	handle /login {
+		jwt_issuer {
+			user_db_path example-users.json
+			sign_key {file./path/to/jwt-secret.txt}
+			token_issuer https://auth.example.com
+			default_token_lifetime 1h
+			cookie_domain .example.com
+		}
+	}
+
+	# Unprotected:
+	@unprotected_html {
+		path /login.html
+		path /logout.html
+	}
+	handle @unprotected_html {
+		header /logout.html {
+			# Make sure this matches the issued cookie from Login Endpoint - especially regarding Domain.
+			# Otherwise, the cookie will not be deleted.
+			"Set-Cookie" "jwt_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Domain=.example.com"
+		}
+		templates
+		file_server {
+			root ./html
+		}
+	}
+
+	# Protected Portal
+	handle /portal.html {
+		jwtauth {
+			sign_key {$JWT_SIGN_KEY}
+			#sign_key {file./path/to/jwt-secret.txt}
+			sign_alg HS256
+			issuer_whitelist https://auth.example.com
+			audience_whitelist "portal"
+			user_claims sub user
+			meta_claims "jti" "ip" "name"
+			from_cookies jwt_token
+		}
+
+		route {
+			templates
+			file_server /*.html {
+				root ./html
+			}
+		}
+	}
+
+	# Instead of 401, redirect to login.html
+	handle_errors 401 {
+		route {
+			redir * /login.html
+		}
+	}
+}
+
+app1.example.com {
+	handle {
+		jwtauth {
+			sign_key {$JWT_SIGN_KEY}
+			sign_alg HS256
+			issuer_whitelist https://auth.example.com
+			audience_whitelist "app1"
+			user_claims sub user
+			meta_claims "jti" "ip" "name"
+			from_cookies jwt_token
+		}
+
+		reverse_proxy http://localhost:5000
+	}
+
+	handle_errors 401 {
+		route {
+			redir * https://auth.example.com/login.html
+		}
+	}
+}
+
+app2.example.com {
+	handle {
+		jwtauth {
+			sign_key {$JWT_SIGN_KEY}
+			sign_alg HS256
+			issuer_whitelist https://auth.example.com
+			audience_whitelist "app2"
+			user_claims sub user
+			meta_claims "jti" "ip" "name"
+			from_cookies jwt_token
+		}
+
+		reverse_proxy http://localhost:5050
+	}
+
+	handle_errors 401 {
+		route {
+			redir * https://auth.example.com/login.html
+		}
+	}
+}
