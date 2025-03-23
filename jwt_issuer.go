@@ -248,15 +248,16 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	if r.URL.Query().Has("cookie") {
 		// Set the JWT as a cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:     "jwt_token",
+			Name:     "jwt_token", // TODO: Make the cookie name configurable
 			Value:    tokenString,
 			Path:     "/",
 			Domain:   m.CookieDomain,
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   r.TLS != nil, // Set Secure to true only if HTTPS is used
 			SameSite: http.SameSiteStrictMode,
 		})
 		// send redirect to a configurable URL
+		// TODO: Make the redirect URL configurable
 		http.Redirect(w, r, "/portal.html", http.StatusFound)
 		return nil
 	}
