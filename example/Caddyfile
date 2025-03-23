@@ -108,6 +108,13 @@ app2.example.com {
 			from_cookies jwt_token
 		}
 
+		# Example: Check if client_ip matches the IP in the JWT
+		@client_ip_not_jwt_ip {
+			not vars {client_ip} {http.auth.user.ip}
+		}
+		# If the client_ip does not match the IP in the JWT, return 401
+		error @client_ip_not_jwt_ip 401
+
 		reverse_proxy http://localhost:5050
 	}
 
