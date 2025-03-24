@@ -57,10 +57,13 @@ type JWTIssuer struct {
 	DefaultTokenLifetime time.Duration `json:"default_token_lifetime,omitempty"`
 
 	// CookieName is the name of the cookie to be sent when the cookie query parameter is present
-	CookieName string
+	CookieName string `json:"cookie_name,omitempty"`
 
 	// CookieDomain is the domain for which the JWT cookie is set.
-	CookieDomain string
+	CookieDomain string `json:"cookie_domain,omitempty"`
+
+	// RedirectURL is the URL to redirect to after issuing the JWT when the cookie query parameter is present
+	RedirectURL string `json:"redirect_url,omitempty"`
 
 	// logger provides structured logging for the module.
 	logger *zap.Logger
@@ -101,6 +104,7 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		zap.String("Default JWT lifetime", m.DefaultTokenLifetime.String()),
 		zap.String("Cookie name", m.CookieName),
 		zap.String("Cookie domain", m.CookieDomain),
+		zap.String("Redirect URL", m.RedirectURL),
 	)
 
 	// Attempt to load users from the specified database path
@@ -266,10 +270,12 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 			Secure:   r.TLS != nil, // Set Secure to true only if HTTPS is used
 			SameSite: http.SameSiteStrictMode,
 		})
-		// send redirect to a configurable URL
-		// TODO: Make the redirect URL configurable
-		http.Redirect(w, r, "/portal.html", http.StatusFound)
-		return nil
+		// Redirect to the configured URL or a default value
+		redirectURL := m.RedirectURL
+		if redirectURL != "" {
+			http.Redirect(w, r, redirectURL, http.StatusFound)
+			return nil
+		}
 	}
 
 	// Send the successful response with the JWT

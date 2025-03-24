@@ -68,6 +68,8 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				m.CookieName = arg
 			case "cookie_domain":
 				m.CookieDomain = arg
+			case "redirect_url":
+				m.RedirectURL = arg
 			default:
 				return d.Errf("unknown subdirective: %s", param)
 			}

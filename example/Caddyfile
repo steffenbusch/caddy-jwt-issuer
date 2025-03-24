@@ -25,6 +25,7 @@ auth.example.com {
 			token_issuer https://auth.example.com
 			default_token_lifetime 1h
 			cookie_domain .example.com
+			redirect_url /portal.html
 		}
 	}
 
