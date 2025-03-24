@@ -6,7 +6,10 @@
       ],
       "token_lifetime": "2h",
       "meta_claims": {
-              "name": "Max Mustermann"
+              "name": "Max Mustermann",
+              "app1": true,
+              "app2": true,
+              "app3": false
       },
       "comment": "Password is password1"
     },
@@ -16,6 +19,10 @@
         "portal","app2"
       ],
       "token_lifetime": "30m",
+      "meta_claims": {
+        "app1": false,
+        "app2": true
+      },
       "totp_secret": "JBSWY3DPEHPK3PXP",
       "comment": "Password is password2 and the 2FA Code for login can be obtained here https://totp.danhersam.com/"
     }

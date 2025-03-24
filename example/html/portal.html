@@ -88,11 +88,18 @@
 </head>
 <body>
   <div class="portal-container">
-    <div class="welcome">Welcome, User {{placeholder "http.auth.user.id"}}</div>
+    <div class="welcome">Welcome, User {{ placeholder "http.auth.user.id" | html }}</div>
     <h2>Available Applications</h2>
     <ul class="app-list">
-      <li><a href="https://todo.example.com/app" target="_blank" class="app-button">App 1 on todo.example.com</a></li>
-      <li><a href="https://rambo.example.com/app" target="_blank" class="app-button">App 2 on rambo.example.com</a></li>
+      {{- if eq (placeholder "http.auth.user.app1") "true" }}
+      <li><a href="https://app1.example.com/" target="_blank" class="app-button">App 1 on app1.example.com</a></li>
+      {{- end }}
+      {{- if eq (placeholder "http.auth.user.app2") "true" }}
+      <li><a href="https://app2.example.com/" target="_blank" class="app-button">App 2 on app2.example.com</a></li>
+      {{- end }}
+      {{- if eq (placeholder "http.auth.user.app3") "true" }}
+      <li><a href="https://app3.example.com/" target="_blank" class="app-button">App 3 on app3.example.com</a></li>
+      {{- end }}
     </ul>
     <a href="https://auth.example.com/logout.html" class="logout-button">Logout</a>
   </div>
