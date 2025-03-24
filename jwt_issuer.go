@@ -56,6 +56,9 @@ type JWTIssuer struct {
 	// Default JWT lifetime unless the user has a specific token lifetime
 	DefaultTokenLifetime time.Duration `json:"default_token_lifetime,omitempty"`
 
+	// CookieName is the name of the cookie to be sent when the cookie query parameter is present
+	CookieName string
+
 	// CookieDomain is the domain for which the JWT cookie is set.
 	CookieDomain string
 
@@ -81,11 +84,22 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		m.usersMutex = &sync.RWMutex{}
 	}
 
+	// Apply a default value of 15 minutes if the default token lifetime is not set
+	if m.DefaultTokenLifetime == 0 {
+		m.DefaultTokenLifetime = 15 * time.Minute
+	}
+
+	if m.CookieName == "" {
+		m.CookieName = "jwt_token"
+	}
+
 	// Log the configuration values. Ensure that sensitive data such as keys are not logged
 	m.logger.Info("JWT-Issuer plugin configured",
 		zap.String("User database path", m.UserDBPath),
 		zap.String("Token issuer", m.TokenIssuer),
 		zap.String("Default JWT lifetime", m.DefaultTokenLifetime.String()),
+		zap.String("Cookie name", m.CookieName),
+		zap.String("Cookie domain", m.CookieDomain),
 	)
 
 	// Attempt to load users from the specified database path
@@ -130,11 +144,6 @@ func (m *JWTIssuer) Validate() error {
 	// Check that a token issuer is provided
 	if m.TokenIssuer == "" {
 		return fmt.Errorf("token issuer is required")
-	}
-
-	// Apply a default value of 15 minutes if the default token lifetime is not set
-	if m.DefaultTokenLifetime == 0 {
-		m.DefaultTokenLifetime = 15 * time.Minute
 	}
 
 	// Ensure the token lifetime is reasonable; for example, it should be positive
@@ -248,7 +257,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	if r.URL.Query().Has("cookie") {
 		// Set the JWT as a cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:     "jwt_token", // TODO: Make the cookie name configurable
+			Name:     m.CookieName,
 			Value:    tokenString,
 			Path:     "/",
 			Domain:   m.CookieDomain,
