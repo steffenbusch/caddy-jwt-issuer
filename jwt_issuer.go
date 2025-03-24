@@ -89,8 +89,9 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		m.DefaultTokenLifetime = 15 * time.Minute
 	}
 
+	// Apply a default cookie name if not set
 	if m.CookieName == "" {
-		m.CookieName = "jwt_token"
+		m.CookieName = "jwt_auth"
 	}
 
 	// Log the configuration values. Ensure that sensitive data such as keys are not logged

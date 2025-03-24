@@ -37,7 +37,7 @@ auth.example.com {
 		header /logout.html {
 			# Make sure this matches the issued cookie from Login Endpoint - especially regarding Domain.
 			# Otherwise, the cookie will not be deleted.
-			"Set-Cookie" "jwt_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Domain=.example.com"
+			"Set-Cookie" "jwt_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Domain=.example.com"
 		}
 		templates
 		file_server {
@@ -55,7 +55,7 @@ auth.example.com {
 			audience_whitelist "portal"
 			user_claims sub user
 			meta_claims "jti" "ip" "name" "app1" "app2" "app3"
-			from_cookies jwt_token
+			from_cookies jwt_auth
 		}
 
 		route {
@@ -83,7 +83,7 @@ app1.example.com {
 			audience_whitelist "app1"
 			user_claims sub user
 			meta_claims "jti" "ip" "name"
-			from_cookies jwt_token
+			from_cookies jwt_auth
 		}
 
 		reverse_proxy http://localhost:5000
@@ -105,7 +105,7 @@ app2.example.com {
 			audience_whitelist "app2"
 			user_claims sub user
 			meta_claims "jti" "ip" "name"
-			from_cookies jwt_token
+			from_cookies jwt_auth
 		}
 
 		# Example: Check if client_ip matches the IP in the JWT
