@@ -25,7 +25,9 @@ auth.example.com {
 			token_issuer https://auth.example.com
 			default_token_lifetime 1h
 			cookie_domain .example.com
-			redirect_url /portal.html
+			# Instead of a redirect_url, login.html can use 401 ?redirectTo=... to redirect to the originating URL
+			# See below (redir * https://auth.example.com/login.html?redirectTo={extra.http.request.url.query_escaped})
+			#redirect_url /portal.html
 		}
 	}
 
@@ -92,7 +94,11 @@ app1.example.com {
 
 	handle_errors 401 {
 		route {
-			redir * https://auth.example.com/login.html
+			# The placeholder {extra.http.request.url.query_escaped} requires the extra-placeholders module (https://github.com/steffenbusch/caddy-extra-placeholders/)
+			extra_placeholders {
+				disable_loadavg_placeholders
+			}
+			redir * https://auth.example.com/login.html?redirectTo={extra.http.request.url.query_escaped}
 		}
 	}
 }
@@ -121,7 +127,11 @@ app2.example.com {
 
 	handle_errors 401 {
 		route {
-			redir * https://auth.example.com/login.html
+			# The placeholder {extra.http.request.url.query_escaped} requires the extra-placeholders module (https://github.com/steffenbusch/caddy-extra-placeholders/)
+			extra_placeholders {
+				disable_loadavg_placeholders
+			}
+			redir * https://auth.example.com/login.html?redirectTo={extra.http.request.url.query_escaped}
 		}
 	}
 }

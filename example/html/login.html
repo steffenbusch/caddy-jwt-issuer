@@ -81,7 +81,28 @@
     </form>
 
     <script>
-        document.getElementById("myForm").addEventListener("submit", function(event) {
+        // Safe redirect function
+        function safeRedirect() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectTo = urlParams.get("redirectTo");
+            const allowedDomains = ["app1.example.com", "app2.example.com"]; // Add allowed domains here
+
+            if (redirectTo) {
+                try {
+                    const decodedUrl = new URL(decodeURIComponent(redirectTo));
+                    if (allowedDomains.includes(decodedUrl.hostname)) {
+                        window.location.href = decodedUrl.href;
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Invalid redirectTo URL:", e);
+                }
+            }
+            // Fallback to default portal
+            window.location.href = "/portal.html";
+        }
+
+        document.getElementById("myForm").addEventListener("submit", function (event) {
             event.preventDefault(); // Prevent default form behavior
 
             // Capture form data
@@ -92,41 +113,44 @@
             });
 
             // Send JSON data
-            fetch("/login?cookie", {  // Adjust the endpoint
+            fetch("/login?cookie", { // Adjust the endpoint
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify(jsonObject)
             })
-            .then(response => {
-                if (response.redirected) {
-                    // Follow the redirect if the server sends one
-                    window.location.href = response.url;
-                } else {
-                    return response.json();
-                }
-            })
-            .then(data => {
-                if (data) {
-                    const messageElement = document.getElementById("message");
-                    if (data.message === "Success") {
-                        messageElement.textContent = "Login successful!";
-                        messageElement.className = "success";
-                        // or redirect here to a custom portal or whoami page
-                        // window.location.href = "/portal.html";
+                .then(response => {
+                    if (response.redirected) {
+                        // Follow the redirect if the server sends one (jwt_issuer configured with redirect_url)
+                        window.location.href = response.url;
                     } else {
-                        messageElement.textContent = data.message;
-                        messageElement.className = "error";
+                        return response.json();
                     }
-                }
-            })
-            .catch(error => {
-                const messageElement = document.getElementById("message");
-                messageElement.textContent = "Error: " + error;
-                messageElement.className = "error";
-                console.error("Error:", error);
-            });
+                })
+                .then(data => {
+                    if (data) {
+                        const messageElement = document.getElementById("message");
+                        if (data.message === "Success") {
+                            messageElement.textContent = "Login successful!";
+                            messageElement.className = "success";
+                            // or redirect here to a hardcoded custom portal or whoami page, but I would recommend to set redirect_url in jwt_issuer instead
+                            // window.location.href = "/portal.html"
+
+                            // Redirect to the URL passed as redirectTo query parameter
+                            safeRedirect();
+                        } else {
+                            messageElement.textContent = data.message;
+                            messageElement.className = "error";
+                        }
+                    }
+                })
+                .catch(error => {
+                    const messageElement = document.getElementById("message");
+                    messageElement.textContent = "Error: " + error;
+                    messageElement.className = "error";
+                    console.error("Error:", error);
+                });
         });
     </script>
 </body>
