@@ -21,6 +21,8 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/olebedev/when"
+	"github.com/olebedev/when/rules/en"
 	"go.uber.org/zap"
 )
 
@@ -69,13 +71,61 @@ func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
 	}
 }
 
-func (m *JWTIssuer) createJWT(user user, clientIP string, ctx context.Context) (string, *jwt.Token, error) {
-	// Determine the token lifetime to use. By default, use the module's token lifetime.
+// determineTokenLifetime calculates the token lifetime for a given user.
+// It prioritizes the user's specific token settings over the module's default settings.
+//
+// The function follows this order of precedence:
+//  1. If the user has a specific "token valid until" time (`user.TokenValidUntil`), it is parsed
+//     and used if it represents a future time. If parsing fails or the time is in the past,
+//     it will not be used.
+//  2. If the user has a specific token lifetime (`user.TokenLifetime`), it is used.
+//  3. If neither of the above is provided, the module's default token lifetime is used.
+func (m *JWTIssuer) determineTokenLifetime(user user) time.Duration {
+	// By default, use the module's token lifetime
 	tokenLifetime := m.DefaultTokenLifetime
+
 	// If the user has a specific token lifetime, use that instead
-	if user.TokenLifetime != nil {
+	if user.TokenLifetime != nil && *user.TokenLifetime > 0 {
 		tokenLifetime = *user.TokenLifetime
 	}
+
+	// However, if the user has a specific token-valid-until time, parse and use it instead
+	if user.TokenValidUntil != "" {
+		w := when.New(nil)
+		w.Add(en.All...)
+		result, err := w.Parse(user.TokenValidUntil, time.Now())
+		if err != nil || result == nil {
+			m.logger.Error("Failed to parse token valid until time",
+				zap.String("username", user.Username),
+				zap.String("token_valid_until", user.TokenValidUntil),
+				zap.Bool("result is nil", result == nil),
+				zap.Error(err),
+			)
+		} else if time.Until(result.Time) > 0 {
+			// If the result time is in the future, use it as the token lifetime
+			tokenLifetime = time.Until(result.Time)
+			m.logger.Debug("Token valid until time parsed successfully",
+				zap.String("username", user.Username),
+				zap.String("token_valid_until", user.TokenValidUntil),
+				zap.String("result_text", result.Text),
+				zap.Time("result_time", result.Time),
+			)
+		} else {
+			m.logger.Error("Token valid until time is in the past",
+				zap.String("username", user.Username),
+				zap.String("token_valid_until", user.TokenValidUntil),
+				zap.String("result_text", result.Text),
+				zap.Time("result_time", result.Time),
+			)
+		}
+	}
+
+	return tokenLifetime
+}
+
+func (m *JWTIssuer) createJWT(user user, clientIP string, ctx context.Context) (string, *jwt.Token, error) {
+	// Determine the token lifetime
+	tokenLifetime := m.determineTokenLifetime(user)
 
 	claims := jwt.MapClaims{
 		"sub": user.Username,
