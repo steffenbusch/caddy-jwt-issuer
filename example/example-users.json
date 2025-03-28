@@ -18,7 +18,7 @@
       "audience": [
         "portal","app2"
       ],
-      "token_lifetime": "30m",
+      "token_valid_until": "tomorrow at 4:00 am",
       "meta_claims": {
         "app1": false,
         "app2": true
