@@ -48,6 +48,10 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		for d.NextBlock(0) {
 			param := d.Val()
 			var arg string
+			if param == "enable_cookie" {
+				m.EnableCookie = true
+				continue
+			}
 			if !d.Args(&arg) {
 				return d.ArgErr()
 			}
@@ -64,6 +68,10 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				m.UserDBPath = arg
 			case "token_issuer":
 				m.TokenIssuer = arg
+			case "cookie_name":
+				m.CookieName = arg
+			case "cookie_domain":
+				m.CookieDomain = arg
 			default:
 				return d.Errf("unknown subdirective: %s", param)
 			}
