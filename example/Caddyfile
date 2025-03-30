@@ -5,20 +5,24 @@
 }
 
 auth.example.com {
-	# redirect all other requests to login.html
 	handle * {
 		route {
 			error /favicon.ico 404
 			# Convenience redirects
 			redir /portal /portal.html
 			redir /logout /logout.html
-			# Other, unspecified requests go to login.html
-			redir * /login.html
+			# Other, unspecified requests go to portal.html, which is protected and requires a login (hence login.html)
+			redir * /portal.html
 		}
 	}
 
 	# Login-Endpoint with JWT-Issuer
 	handle /login {
+		@get_login {
+			method GET
+		}
+		redir @get_login /login.html
+
 		jwt_issuer {
 			user_db_path example-users.json
 			sign_key {file./path/to/jwt-secret.txt}
