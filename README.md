@@ -100,6 +100,12 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
        "api-endpoint-1"
      ],
      "token_lifetime": "1h",
+     "meta_claims": {
+       "name": "Bob Example",
+       "app1": true,
+       "app2": false,
+       "app3": true
+     },
      "comment": "Password is Tschigerillo"
    },
    "alice": {
@@ -108,15 +114,45 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
        "api-endpoint-1",
        "admin-endpoint"
      ],
+     "token_valid_until": "tomorrow at 4:00 am",
+     "totp_secret": "JBSWY3DPEHPK3PXP",
+     "meta_claims": {
+       "name": "Alice Example",
+       "app1": false,
+       "app2": true,
+       "app3": false
+     },
      "comment": "For security, do not use plaintext passwords in comments as demonstrated above."
    }
 }
 ```
 
+This example demonstrates the following configuration options:
+
+- `"password"`: The bcrypt hash of the user's password.
+- `"audience"`: A list of audiences the user has access to.
+- `"token_lifetime"` (optional): Specifies the lifetime of the token for this user (e.g., "1h"). If present, it will override the `default_token_lifetime` configured for the plugin.
+- `"token_valid_until"` (optional): A specific expiration time for the token (e.g., "tomorrow at 4:00 am"). If present, it will override both the `"token_lifetime"` for the user and the `default_token_lifetime` configured for the plugin. This field supports natural language date/time parsing using [when](https://github.com/olebedev/when). For more information, refer to the [when documentation](https://github.com/olebedev/when).
+- `"totp_secret"` (optional): Specifies the TOTP secret for enabling two-factor authentication (2FA). If provided, the user will be required to enter a time-based one-time password (TOTP) during login. To set up the secret in a 2FA app, you can use a tool like [https://stefansundin.github.io/2fa-qr/](https://stefansundin.github.io/2fa-qr/).
+- `"meta_claims"` (optional): Additional claims to include in the token, such as:
+  - `"name"`: The user's full name.
+
+Placeholder Support: Values in `meta_claims` can include placeholders, which will be dynamically replaced at the time of JWT issuance. For example, a placeholder like `{http.vars.client_ip}` will be replaced with the IP Address of the client.
+
+By default, the issued JWT includes an `ip` claim representing the client's IP address. Additional predefined claims are as follows: `sub` (username), `iss` (value from `token_issuer`), `aud` (an array of audiences), `jti` (a unique identifier), `iat` (issued-at timestamp), `nbf` (not-before timestamp), and `exp` (expiration timestamp). These predefined claims are immutable and cannot be overridden by custom meta claims.
+
+These `meta_claims` can be very useful when used with the `jwtauth` directive of the [caddy-jwt](https://github.com/ggicci/caddy-jwt) plugin, as this Caddy plugin can provide such meta claims as placeholders. These placeholders can then be utilized in various contexts, such as rendering dynamic content in HTML templates. For more details about how `meta_claims` are handled in the `jwtauth` plugin, refer to the [source code explanation](https://github.com/ggicci/caddy-jwt/blob/main/jwt.go#L121).
+
 To generate a bcrypt password hash, you can use the `caddy` command itself:
 
 ```bash
 caddy hash-password
+```
+
+To create a secure, random key in the correct format for the `totp_secret`, you can use the following command:
+
+```bash
+openssl rand 30 | base32 | tr --delete '='
 ```
 
 If you need to update user information such as adding a new user, updating a password hash, or changing the audience, you can modify the users database file accordingly. After making the changes, reload the Caddy configuration with `--force` to apply the updates.
@@ -140,3 +176,6 @@ This project is licensed under the Apache License, Version 2.0. See the [LICENSE
 ## Acknowledgements
 
 - [Caddy](https://caddyserver.com) for providing a powerful and extensible web server.
+- [caddy-jwt](https://github.com/ggicci/caddy-jwt) for `jwtauth`, which provides the JWT Authentication.
+- [when](https://github.com/olebedev/when/) for natural language date/time parsing used in `token_valid_until`.
+- [otp](https://github.com/pquerna/otp/) for TOTP used to validate the 2FA codes.
