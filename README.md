@@ -157,7 +157,7 @@ openssl rand 30 | base32 | tr --delete '='
 
 If you need to update user information such as adding a new user, updating a password hash, or changing the audience, you can modify the users database file accordingly. After making the changes, reload the Caddy configuration with `--force` to apply the updates.
 
-### Example: Obtaining a JWT
+## Example: Obtaining a JWT
 
 You can obtain a JWT by sending a POST request to the configured endpoint such as `localhost:8080/login` (due to `handle /login` in the `Caddyfile`)
 with `Content-Type` of `application/json` and the POST data of the credentials. Here is an example using `curl`:
@@ -168,6 +168,12 @@ curl http://localhost:8080/login \
      -d '{"username": "bob", "password": "Tschigerillo"}'
 {"message":"Success","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiYXBpLWVuZHBvaW50LTEiXSwiZXhwIjoxNzM5MTEzODcyLCJpYXQiOjE3MzkxMTAyNzIsImlzcyI6Imh0dHBzOi8vand0LmV4YW1wbGUuY29tIiwianRpIjoiNzMyZjk0ZGEtYTQyYS00MDJkLTgzNzctMjYwY2MzYzRjN2ZlIiwibmJmIjoxNzM5MTEwMjcyLCJzdWIiOiJib2IifQ._FRER6YwUTSUXXyfpEvgb_1NRejfBQT_EIFDBGUMEx4"}
 ```
+
+## Example: Interactive Login
+
+This folder contains an example configuration for using the Caddy JWT Issuer plugin. The setup demonstrates how to protect multiple applications with JWT-based authentication and how to issue tokens using an interactive login endpoint.
+
+Users can log in through a browser form to obtain a JWT, which can then be used to access protected resources. For more details and example configurations, see the [examples folder](./example).
 
 ## License
 
