@@ -54,8 +54,7 @@ auth.example.com {
 	# Protected Portal
 	handle /portal.html {
 		jwtauth {
-			sign_key {$JWT_SIGN_KEY}
-			#sign_key {file./path/to/jwt-secret.txt}
+			sign_key {file./path/to/jwt-secret.txt}
 			sign_alg HS256
 			issuer_whitelist https://auth.example.com
 			audience_whitelist "portal"
@@ -75,7 +74,11 @@ auth.example.com {
 	# Instead of 401, redirect to login.html
 	handle_errors 401 {
 		route {
-			redir * /login.html
+			# The placeholder {extra.http.request.url.query_escaped} requires the extra-placeholders module (https://github.com/steffenbusch/caddy-extra-placeholders/)
+			extra_placeholders {
+				disable_loadavg_placeholders
+			}
+			redir * /login.html?redirectTo={extra.http.request.url.query_escaped}
 		}
 	}
 }
@@ -83,7 +86,7 @@ auth.example.com {
 app1.example.com {
 	handle {
 		jwtauth {
-			sign_key {$JWT_SIGN_KEY}
+			sign_key {file./path/to/jwt-secret.txt}
 			sign_alg HS256
 			issuer_whitelist https://auth.example.com
 			audience_whitelist "app1"
@@ -109,7 +112,7 @@ app1.example.com {
 app2.example.com {
 	handle {
 		jwtauth {
-			sign_key {$JWT_SIGN_KEY}
+			sign_key {file./path/to/jwt-secret.txt}
 			sign_alg HS256
 			issuer_whitelist https://auth.example.com
 			audience_whitelist "app2"

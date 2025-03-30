@@ -74,7 +74,7 @@ The following example demonstrates how to protect an API endpoint using the cadd
     route /api/* {
         # See https://github.com/ggicci/caddy-jwt
         jwtauth {
-            sign_key {$JWT_SIGN_KEY}
+            sign_key {file./path/to/jwt-secret.txt}
             sign_alg HS256
             issuer_whitelist https://jwt.example.com
             audience_whitelist "api-endpoint-1"
