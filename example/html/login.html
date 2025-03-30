@@ -98,7 +98,7 @@
             Log in with another user if applicable.
         </div>
         {{- end }}
-        <form id="myForm">
+        <form id="auth">
             <label for="username">Username:</label>
             <input type="text" id="username" name="username" required autofocus>
 
@@ -137,7 +137,7 @@
             window.location.href = "/portal.html";
         }
 
-        document.getElementById("myForm").addEventListener("submit", function (event) {
+        document.getElementById("auth").addEventListener("submit", function (event) {
             event.preventDefault(); // Prevent default form behavior
 
             // Capture form data
