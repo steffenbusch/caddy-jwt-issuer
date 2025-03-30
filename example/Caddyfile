@@ -28,10 +28,9 @@ auth.example.com {
 			sign_key {file./path/to/jwt-secret.txt}
 			token_issuer https://auth.example.com
 			default_token_lifetime 1h
+			enable_cookie
+			cookie_name jwt_auth
 			cookie_domain .example.com
-			# Instead of a redirect_url, login.html can use 401 ?redirectTo=... to redirect to the originating URL
-			# See below (redir * https://auth.example.com/login.html?redirectTo={extra.http.request.url.query_escaped})
-			#redirect_url /portal.html
 		}
 	}
 

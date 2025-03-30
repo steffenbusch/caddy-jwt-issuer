@@ -56,14 +56,14 @@ type JWTIssuer struct {
 	// Default JWT lifetime unless the user has a specific token lifetime
 	DefaultTokenLifetime time.Duration `json:"default_token_lifetime,omitempty"`
 
+	// EnableCookie determines whether a cookie will be set in the HTTP response containing the issued JWT.
+	EnableCookie bool `json:"enable_cookie,omitempty"`
+
 	// CookieName is the name of the cookie to be sent when the cookie query parameter is present
 	CookieName string `json:"cookie_name,omitempty"`
 
 	// CookieDomain is the domain for which the JWT cookie is set.
 	CookieDomain string `json:"cookie_domain,omitempty"`
-
-	// RedirectURL is the URL to redirect to after issuing the JWT when the cookie query parameter is present
-	RedirectURL string `json:"redirect_url,omitempty"`
 
 	// logger provides structured logging for the module.
 	logger *zap.Logger
@@ -104,7 +104,7 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		zap.String("Default JWT lifetime", m.DefaultTokenLifetime.String()),
 		zap.String("Cookie name", m.CookieName),
 		zap.String("Cookie domain", m.CookieDomain),
-		zap.String("Redirect URL", m.RedirectURL),
+		zap.Bool("Enable JWT cookie", m.EnableCookie),
 	)
 
 	// Attempt to load users from the specified database path
@@ -258,8 +258,8 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Log JWT details
 	logJWTDetails(logger, tokenString, token)
 
-	// Check if the cookie query parameter is present
-	if r.URL.Query().Has("cookie") {
+	// Check if the JWT should be sent as a cookie in the HTTP response as well
+	if m.EnableCookie {
 		// Set the JWT as a cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     m.CookieName,
@@ -270,12 +270,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 			Secure:   r.TLS != nil, // Set Secure to true only if HTTPS is used
 			SameSite: http.SameSiteStrictMode,
 		})
-		// Redirect to the configured URL or a default value
-		redirectURL := m.RedirectURL
-		if redirectURL != "" {
-			http.Redirect(w, r, redirectURL, http.StatusFound)
-			return nil
-		}
+
 	}
 
 	// Send the successful response with the JWT

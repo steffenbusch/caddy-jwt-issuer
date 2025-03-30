@@ -132,7 +132,8 @@
                     console.error("Invalid redirectTo URL:", e);
                 }
             }
-            // Fallback to default portal
+            // Fallback to a default URL if no redirectTo is found
+            // or if the domain is not allowed
             window.location.href = "/portal.html";
         }
 
@@ -147,31 +148,20 @@
             });
 
             // Send JSON data
-            fetch("/login?cookie", { // Adjust the endpoint
+            fetch("/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify(jsonObject)
             })
-                .then(response => {
-                    if (response.redirected) {
-                        // Follow the redirect if the server sends one (jwt_issuer configured with redirect_url)
-                        window.location.href = response.url;
-                    } else {
-                        return response.json();
-                    }
-                })
+                .then(response => response.json())
                 .then(data => {
                     if (data) {
                         const messageElement = document.getElementById("message");
                         if (data.message === "Success") {
                             messageElement.textContent = "Login successful!";
                             messageElement.className = "success";
-                            // or redirect here to a hardcoded custom portal or whoami page, but I would recommend to set redirect_url in jwt_issuer instead
-                            // window.location.href = "/portal.html"
-
-                            // Redirect to the URL passed as redirectTo query parameter
                             safeRedirect();
                         } else {
                             messageElement.textContent = data.message;

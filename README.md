@@ -14,6 +14,7 @@ This plugin provides the following features:
 - **User Database**: Supports loading user credentials from a specified JSON file.
 - **HS256 Signing**: Generates JWTs with the symmetric signing algorithm HS256.
 - **Structured Logging**: Provides detailed logging for authentication attempts and token issuance. The emitted logs can be used with `fail2ban` or similar tools to block repeated failed attempts.
+- **Customizable Cookies**: Allows setting custom cookie names and domains for issued JWTs.
 
 ## Building
 
@@ -35,6 +36,9 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
             user_db_path <path-to-user-db>
             token_issuer <issuer-name>
             default_token_lifetime <duration>
+            enable_cookie
+            cookie_name <cookie-name>
+            cookie_domain <cookie-domain>
         }
     }
 }
@@ -48,6 +52,9 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
 - `user_db_path`: The path to the user database JSON file containing username, password, audience information, and optional deviating token lifetime. See the [example](#sample-usersjson) at the end of this README.
 - `token_issuer`: The issuer name to be included in the JWTs.
 - `default_token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour). If not configured, the default value is 15 minutes.
+- `enable_cookie`: If this option is present, the plugin will set a cookie in the HTTP response containing the issued JWT.
+- `cookie_name`: The name of the cookie used to store the JWT. Defaults to `jwt_auth` if not specified.
+- `cookie_domain`: The domain for which the cookie is valid. For example, `.example.com` makes the cookie valid for all subdomains of `example.com`.
 
 ### Example: Protecting an API Endpoint
 
