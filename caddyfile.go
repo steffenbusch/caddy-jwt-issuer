@@ -22,6 +22,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/steffenbusch/caddy-jwt-issuer/matchers"
 )
 
 // Initialize the module by registering it with Caddy
@@ -29,6 +30,8 @@ func init() {
 	caddy.RegisterModule(JWTIssuer{})
 	httpcaddyfile.RegisterHandlerDirective("jwt_issuer", parseCaddyfile)
 	httpcaddyfile.RegisterDirectiveOrder("jwt_issuer", "after", "basic_auth")
+	// Register the matcher
+	caddy.RegisterModule(matchers.TokenIsBlocked{})
 }
 
 // parseCaddyfile parses the Caddyfile configuration
