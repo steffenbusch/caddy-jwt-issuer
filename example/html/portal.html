@@ -84,6 +84,12 @@
     .logout-button:hover {
       background-color: #d32f2f;
     }
+
+    .session-expiry {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -101,6 +107,13 @@
       <li><a href="https://app3.example.com/" target="_blank" class="app-button">App 3 on app3.example.com</a></li>
       {{- end }}
     </ul>
+    <div class="session-expiry">
+      {{- $exp := toDate "2006-01-02T15:04:05Z07:00" (placeholder "http.auth.user.exp") -}}
+      {{- $ago := printf "%s" ($exp | ago) -}}
+      {{- $expTime := $exp | date "2006-01-02 15:04:05 MST" -}}
+      ⌛ <strong>Session expires in {{ trimPrefix "-" $ago }}</strong><br>
+      on {{ $expTime }}
+    </div>
     <a href="https://auth.example.com/logout.html" class="logout-button">Logout</a>
   </div>
 </body>

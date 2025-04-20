@@ -122,7 +122,7 @@ auth.example.com {
 			issuer_whitelist https://auth.example.com
 			audience_whitelist "portal"
 			user_claims sub user
-			meta_claims "jti" "ip" "name" "app1" "app2" "app3"
+			meta_claims "jti" "ip" "exp" "name" "app1" "app2" "app3"
 			from_cookies jwt_auth
 		}
 
