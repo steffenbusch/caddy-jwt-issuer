@@ -15,7 +15,7 @@ This plugin provides the following features:
 - **HS256 Signing**: Generates JWTs with the symmetric signing algorithm HS256.
 - **Structured Logging**: Provides detailed logging for authentication attempts and token issuance. The emitted logs can be used with `fail2ban` or similar tools to block repeated failed attempts.
 - **Customizable Cookies**: Allows setting custom cookie names and domains for issued JWTs.
-- **Token Revocation**: Includes the `token_is_blocked` matcher to block requests with revoked tokens by referencing a blocklist file. This blocklist file must be maintained by `placeholder_dump` - see example below.
+- **Token Revocation**: Includes the `token_is_blocked` matcher to block requests with revoked tokens by referencing a blocklist file. This blocklist file could be maintained by `placeholder_dump`.
 
 ## Building
 
