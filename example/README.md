@@ -17,11 +17,14 @@ The example is designed for a scenario where:
 The main configuration file for the Caddy server. It includes:
 
 - **`auth.example.com`**:
-  - Handles login and token issuance.
-  - Protects the `/portal.html` endpoint with JWT authentication.
+  - Handles login and token issuance using the `jwt_issuer` directive.
+  - Protects the `/portal.html` and `/logout.html` endpoint with JWT authentication.
+  - Upon logout, the HTTP cookie is cleared, and the JWT's JTI is added to a blocklist file as specified by the `placeholder_dump` configuration.
+    For more information about the `placeholder_dump` directive, visit its [GitHub repository](https://github.com/steffenbusch/caddy-placeholder-dump).
   - Redirects unauthenticated users to the login page.
 - **`app1.example.com`** and **`app2.example.com`**:
   - Protect resources using JWT authentication.
+  - Uses the `token_is_blocked` matcher to block requests with revoked tokens.
   - Redirect unauthenticated users to the central login page.
 
 ### `example-users.json`
@@ -43,6 +46,7 @@ A folder containing static HTML files for the login, logout, and portal pages:
 
 2. **Update Configuration**:
    - Adjust placeholders in the `Caddyfile` (e.g., `{file./path/to/jwt-secret.txt}`) with actual values.
+   - Configure the `blocklist_file` option in the `token_is_blocked` matcher to specify the path to the blocklist file.
 
 3. **Start Caddy**:
    - Run the Caddy server using the provided `Caddyfile`.
@@ -54,7 +58,8 @@ A folder containing static HTML files for the login, logout, and portal pages:
 ## Notes
 
 - The `jwt_issuer` directive is responsible for issuing tokens, while the `jwtauth` directive validates them.
+- The `token_is_blocked` matcher ensures that revoked tokens are blocked by referencing a blocklist file.
 - The `extra-placeholders` module is used to handle redirection with query parameters.
-- Ensure the `example-users.json` file is properly secured and not exposed publicly.
+- Ensure the `example-users.json` file and the blocklist file are properly secured and not exposed publicly.
 
 For more details, refer to the [Caddy documentation](https://caddyserver.com/docs/) and the plugin repositories.
