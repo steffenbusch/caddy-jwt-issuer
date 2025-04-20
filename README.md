@@ -15,6 +15,7 @@ This plugin provides the following features:
 - **HS256 Signing**: Generates JWTs with the symmetric signing algorithm HS256.
 - **Structured Logging**: Provides detailed logging for authentication attempts and token issuance. The emitted logs can be used with `fail2ban` or similar tools to block repeated failed attempts.
 - **Customizable Cookies**: Allows setting custom cookie names and domains for issued JWTs.
+- **Token Revocation**: Includes the `token_is_blocked` matcher to block requests with revoked tokens by referencing a blocklist file. This blocklist file must be maintained by `placeholder_dump` - see example below.
 
 ## Building
 
@@ -46,15 +47,19 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
 
 ### Configuration Options
 
-- `sign_key`: The base64-encoded secret key used to sign the JWTs.
-  - *Usage Tip*: To create a secure base64-encoded sign key, you can use the command `openssl rand -base64 32`. This command generates a random 32-byte key and encodes it in base64 format.
-  - *Placeholder Support*: You can also use a placeholder to reference a file containing the key, such as `{file./path/to/jwt-secret.txt}`. The file's content will be read and used as the signing key.
-- `user_db_path`: The path to the user database JSON file containing username, password, audience information, and optional deviating token lifetime. See the [example](#sample-usersjson) at the end of this README.
-- `token_issuer`: The issuer name to be included in the JWTs.
-- `default_token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour). If not configured, the default value is 15 minutes.
-- `enable_cookie`: If this option is present, the plugin will set a cookie in the HTTP response containing the issued JWT.
-- `cookie_name`: The name of the cookie used to store the JWT. Defaults to `jwt_auth` if not specified.
-- `cookie_domain`: The domain for which the cookie is valid. For example, `.example.com` makes the cookie valid for all subdomains of `example.com`.
+- **`jwt_issuer`**:
+  - `sign_key`: The base64-encoded secret key used to sign the JWTs.
+    - *Usage Tip*: To create a secure base64-encoded sign key, you can use the command `openssl rand -base64 32`. This command generates a random 32-byte key and encodes it in base64 format.
+    - *Placeholder Support*: You can also use a placeholder to reference a file containing the key, such as `{file./path/to/jwt-secret.txt}`. The file's content will be read and used as the signing key.
+  - `user_db_path`: The path to the user database JSON file containing username, password, audience information, and optional deviating token lifetime. See the [example](#sample-usersjson) at the end of this README.
+  - `token_issuer`: The issuer name to be included in the JWTs.
+  - `default_token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour). If not configured, the default value is 15 minutes.
+  - `enable_cookie`: If this option is present, the plugin will set a cookie in the HTTP response containing the issued JWT.
+  - `cookie_name`: The name of the cookie used to store the JWT. Defaults to `jwt_auth` if not specified.
+  - `cookie_domain`: The domain for which the cookie is valid. For example, `.example.com` makes the cookie valid for all subdomains of `example.com`.
+- **`token_is_blocked`**:
+  - `blocklist_file`: Path to the blocklist file containing revoked tokens (one token per line). The file is automatically reloaded when modified.
+  - `placeholder`: Placeholder containing the token to check (e.g., `{http.auth.user.jti}`). Defaults to `{http.auth.user.jti}`.
 
 ### Example: Protecting an API Endpoint
 
@@ -174,6 +179,8 @@ curl http://localhost:8080/login \
 This folder contains an example configuration for using the Caddy JWT Issuer plugin. The setup demonstrates how to protect multiple applications with JWT-based authentication and how to issue tokens using an interactive login endpoint.
 
 Users can log in through a browser form to obtain a JWT, which can then be used to access protected resources. For more details and example configurations, see the [examples folder](./example).
+
+The example Caddyfile also includes snippets demonstrating how to customize error messages on the login page. These messages can be tailored for scenarios such as token expiration, invalid audience claims (e.g., "Access Denied"), and more. Additionally, the example shows how the logout endpoint can store the JWT's JTI in a blocklist, and how this blocklist can be utilized with the `token_is_blocked` matcher to prevent access using revoked tokens.
 
 ## License
 
