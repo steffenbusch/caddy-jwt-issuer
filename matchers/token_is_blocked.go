@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 
@@ -97,11 +98,17 @@ func (m *TokenIsBlocked) Provision(ctx caddy.Context) error {
 	}
 	m.watcher = watcher
 
-	go m.watchFileLoop()
-
-	if err := m.watcher.Add(m.BlocklistFile); err != nil {
-		return fmt.Errorf("watching blocklist file failed: %w", err)
+	// Monitor the parent directory of the blocklist file instead of the file itself.
+	// This is because many programs update files atomically by replacing them, which
+	// can cause the watcher to lose track of the file. Monitoring the parent directory
+	// ensures that we can detect changes even if the file is replaced.
+	// Reference: https://pkg.go.dev/github.com/fsnotify/fsnotify#readme-watching-a-file-doesn-t-work-well
+	blocklistDir := filepath.Dir(m.BlocklistFile)
+	if err := m.watcher.Add(blocklistDir); err != nil {
+		return fmt.Errorf("watching blocklist directory failed: %w", err)
 	}
+
+	go m.watchDirectoryLoop()
 
 	return nil
 }
@@ -161,14 +168,19 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 	return nil
 }
 
-func (m *TokenIsBlocked) watchFileLoop() {
+func (m *TokenIsBlocked) watchDirectoryLoop() {
 	for {
 		select {
 		case event, ok := <-m.watcher.Events:
 			if !ok {
 				return
 			}
-			if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
+			// Check if the event is for the blocklist file
+			if filepath.Clean(event.Name) != filepath.Clean(m.BlocklistFile) {
+				continue
+			}
+			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) != 0 {
+				m.logger.Debug("Detected blocklist file change", zap.String("event", event.Op.String()))
 				if err := m.loadBlocklist(); err != nil {
 					m.logger.Warn("Failed to reload blocklist", zap.Error(err))
 				}
