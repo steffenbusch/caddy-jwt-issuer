@@ -131,12 +131,22 @@
         function safeRedirect() {
             const urlParams = new URLSearchParams(window.location.search);
             const redirectTo = urlParams.get("redirectTo");
-            const allowedDomains = ["app1.example.com", "app2.example.com"]; // Add allowed domains here
+            // Define allowed domains or domain suffixes
+            // Uncomment the line below to allow specific domains
+            //const allowedDomains = ["app1.example.com", "app2.example.com"]; // Add allowed domains here
+            const allowedDomainSuffixes = ["example.com"];
 
             if (redirectTo) {
                 try {
                     const decodedUrl = new URL(decodeURIComponent(redirectTo));
-                    if (allowedDomains.includes(decodedUrl.hostname)) {
+                    const hostname = decodedUrl.hostname;
+                    // Uncomment the line below to check against specific domains
+                    //const isAllowed = allowedDomains.includes(hostname); // Check if hostname is in allowed domains
+                    const isAllowed = allowedDomainSuffixes.some(suffix =>
+                        hostname === suffix || // Check if hostname matches the suffix exactly
+                        hostname.endsWith("." + suffix) // Check if hostname ends with the suffix
+                    );
+                    if (isAllowed) {
                         window.location.href = decodedUrl.href;
                         return;
                     }
