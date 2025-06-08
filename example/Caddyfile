@@ -58,7 +58,7 @@
 			respond @isBasicAuth 401
 
 			# Note:
-			# The placeholder {extra.http.request.url.query_escaped} requires the extra-placeholders module (https://github.com/steffenbusch/caddy-extra-placeholders/)
+			# The placeholder {extra.http.request.url.query_escaped} requires the extra-placeholders plugin (https://github.com/steffenbusch/caddy-extra-placeholders)
 			extra_placeholders {
 				disable_loadavg_placeholders
 			}
@@ -131,7 +131,7 @@ auth.example.com {
 
 			# Note:
 			# On Logout, the JTI is added to the file jti_blocklist.txt
-			# The directive placeholder_dump requires the caddy-placeholder-dump module (https://github.com/steffenbusch/caddy-placeholder-dump)
+			# The directive placeholder_dump requires the caddy-placeholder-dump plugin (https://github.com/steffenbusch/caddy-placeholder-dump)
 			# Attention: You should not let this file grow indefinitely. If you change the jwtauth sign_key, clear the content of this file.
 			placeholder_dump /logout.html {
 				file jti_blocklist.txt
@@ -142,7 +142,8 @@ auth.example.com {
 			header /logout.html {
 				# Make sure this matches the issued cookie from Login Endpoint - especially regarding Domain.
 				# Otherwise, the cookie will not be deleted.
-				"Set-Cookie" "jwt_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure=true; SameSite=Strict; Domain=.example.com"
+				+Set-Cookie "jwt_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure=true; SameSite=Strict; Domain=.example.com"
+				+Set-Cookie "cpa_sess=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure=true; SameSite=Strict; Domain=.example.com"
 			}
 
 			templates
@@ -193,6 +194,16 @@ app2.example.com {
 			user_claims sub user
 			meta_claims "jti" "ip" "name"
 			from_cookies jwt_auth
+		}
+
+		# Note:
+		# This directive, to require a 2FA (TOTP) after jwtauth, requires the caddy-postauth-2fa plugin (https://github.com/steffenbusch/caddy-postauth-2fa)
+		postauth_2fa {
+			sign_key {file./path/to/jwt-secret.txt}
+			session_inactivity_timeout 2h
+			secrets_file_path example-users.json
+			cookie_domain .example.com
+			cookie_name cpa_sess
 		}
 
 		import snippet_check_token_blocklist
