@@ -127,7 +127,7 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
        "app2": true,
        "app3": false
      },
-     "comment": "For security, do not use plaintext passwords in comments as demonstrated above."
+     "comment": "For security, do not use plaintext passwords in comments as demonstrated above. Use https://github.com/steffenbusch/caddy-postauth-2fa for 2FA support after jwtauth."
    }
 }
 ```
@@ -138,7 +138,6 @@ This example demonstrates the following configuration options:
 - `"audience"`: A list of audiences the user has access to.
 - `"token_lifetime"` (optional): Specifies the lifetime of the token for this user (e.g., "1h"). If present, it will override the `default_token_lifetime` configured for the plugin.
 - `"token_valid_until"` (optional): A specific expiration time for the token (e.g., "tomorrow at 4:00 am"). If present, it will override both the `"token_lifetime"` for the user and the `default_token_lifetime` configured for the plugin. This field supports natural language date/time parsing using [when](https://github.com/olebedev/when). For more information, refer to the [when documentation](https://github.com/olebedev/when).
-- `"totp_secret"` (optional): Specifies the TOTP secret for enabling two-factor authentication (2FA). If provided, the user will be required to enter a time-based one-time password (TOTP) during login. To set up the secret in a 2FA app, you can use a tool like [https://stefansundin.github.io/2fa-qr/](https://stefansundin.github.io/2fa-qr/).
 - `"meta_claims"` (optional): Additional claims to include in the token, such as:
   - `"name"`: The user's full name.
 
@@ -152,12 +151,6 @@ To generate a bcrypt password hash, you can use the `caddy` command itself:
 
 ```bash
 caddy hash-password
-```
-
-To create a secure, random key in the correct format for the `totp_secret`, you can use the following command:
-
-```bash
-openssl rand 30 | base32 | tr --delete '='
 ```
 
 If you need to update user information such as adding a new user, updating a password hash, or changing the audience, you can modify the users database file accordingly. After making the changes, reload the Caddy configuration with `--force` to apply the updates.
@@ -191,4 +184,3 @@ This project is licensed under the Apache License, Version 2.0. See the [LICENSE
 - [Caddy](https://caddyserver.com) for providing a powerful and extensible web server.
 - [caddy-jwt](https://github.com/ggicci/caddy-jwt) for `jwtauth`, which provides the JWT Authentication.
 - [when](https://github.com/olebedev/when/) for natural language date/time parsing used in `token_valid_until`.
-- [otp](https://github.com/pquerna/otp/) for TOTP used to validate the 2FA codes.

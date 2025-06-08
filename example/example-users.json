@@ -24,6 +24,6 @@
         "app2": true
       },
       "totp_secret": "JBSWY3DPEHPK3PXP",
-      "comment": "Password is password2 and the 2FA Code for login can be obtained here https://totp.danhersam.com/"
+      "comment": "Password is password2 and the 2FA Code for login can be obtained here https://totp.danhersam.com/. Use https://github.com/steffenbusch/caddy-postauth-2fa for 2FA support after jwtauth."
     }
   }

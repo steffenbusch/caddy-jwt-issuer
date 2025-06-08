@@ -26,7 +26,6 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/pquerna/otp/totp"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -224,23 +223,6 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		logger.Warn("Authentication failed due to wrong password", zap.String("username", providedCredentials.Username))
 		jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
 		return nil
-	}
-
-	// Check if TOTP is required for the user
-	if userEntry.TOTPSecret != "" {
-		if providedCredentials.TOTP == "" {
-			logger.Warn("TOTP code missing for user", zap.String("username", providedCredentials.Username))
-			jsonError(w, http.StatusUnauthorized, "Unauthorized: Missing TOTP code")
-			return nil
-		}
-
-		// Validate the TOTP code with the user's secret.
-		// If validation fails, log an invalid TOTP attempt for monitoring tools like fail2ban.
-		if !totp.Validate(providedCredentials.TOTP, userEntry.TOTPSecret) {
-			logger.Warn("Invalid TOTP attempt", zap.String("username", providedCredentials.Username))
-			jsonError(w, http.StatusUnauthorized, "Unauthorized: Invalid TOTP code")
-			return nil
-		}
 	}
 
 	// Create the JWT

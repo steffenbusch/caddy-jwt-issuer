@@ -30,14 +30,12 @@ type user struct {
 	Audience        []string
 	TokenLifetime   *time.Duration
 	TokenValidUntil string
-	TOTPSecret      string
 	MetaClaims      map[string]any
 }
 
 type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
-	TOTP     string `json:"totp,omitempty"`
 }
 
 // validateUserEntry ensures the user entry is correct.
@@ -80,7 +78,6 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 		Audience        []string       `json:"audience"`
 		TokenLifetime   *string        `json:"token_lifetime"`
 		TokenValidUntil string         `json:"token_valid_until"`
-		TOTPSecret      string         `json:"totp_secret"`
 		MetaClaims      map[string]any `json:"meta_claims"`
 	})
 
@@ -110,7 +107,6 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 			Password:        userData.Password,
 			Audience:        userData.Audience,
 			TokenLifetime:   tokenLifetime,
-			TOTPSecret:      userData.TOTPSecret,
 			MetaClaims:      userData.MetaClaims,
 			TokenValidUntil: userData.TokenValidUntil,
 		}
