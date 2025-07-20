@@ -1,0 +1,216 @@
+{
+	debug
+	email example@example.com
+	order jwtauth before basic_auth
+}
+
+## Snippets
+# This snippet is used to check if the JWT is blocked.
+(snippet_check_token_blocklist) {
+	@blocked token_is_blocked {
+		blocklist_file jti_blocklist.txt
+		placeholder {http.auth.user.jti}
+	}
+	route @blocked {
+		# Set this variable, so it can be handled by snippet_handle_errors_401
+		vars jwt.isBlocked true
+		error 401
+	}
+}
+
+# This snippet can be used to ensure that only the IP address used during JWT issuance
+# is allowed to access the protected resource.
+(snippet_check_current_ip_not_jwt_ip) {
+	# Check if client_ip matches the IP in the JWT
+	@client_ip_not_jwt_ip {
+		not vars {http.auth.user.ip} ""
+		not vars {client_ip} {http.auth.user.ip}
+	}
+	route @client_ip_not_jwt_ip {
+		# Set this variable, so it can be handled by snippet_handle_errors_401
+		vars jwt.client_ip_not_jwt_ip true
+		error 401
+	}
+}
+
+# This snippet is used to handle 401 errors with individual redirects.
+(snippet_handle_errors_401) {
+	handle_errors 401 {
+		# Request Matcher to check if the error is caused by basic_auth
+		@isBasicAuth {
+			vars {http.vars.isBasicAuth} true
+		}
+
+		@jwt_is_blocked {
+			vars {http.vars.jwt.isBlocked} true
+		}
+		@jwt_ip_not_jwt_ip {
+			vars {http.vars.jwt.client_ip_not_jwt_ip} true
+		}
+		@jwt_invalid_audience {
+			vars {http.auth.jwt.error} "invalid audience"
+		}
+		@jwt_expired {
+			vars {http.auth.jwt.error} `"exp" not satisfied`
+		}
+		route {
+			# If the 401 error originates from the basic_auth directive, just respond with 401
+			respond @isBasicAuth 401
+
+			# Note:
+			# The placeholder {extra.http.request.url.query_escaped} requires the extra-placeholders plugin (https://github.com/steffenbusch/caddy-extra-placeholders)
+			extra_placeholders {
+				disable_loadavg_placeholders
+			}
+			vars auth.portal.login.url "https://auth.example.com/login.html"
+			redir @jwt_ip_not_jwt_ip {http.vars.auth.portal.login.url}?reason=ip_mismatch&redirectTo={extra.http.request.url.query_escaped}
+			redir @jwt_is_blocked {http.vars.auth.portal.login.url}?reason=token_blocked&redirectTo={extra.http.request.url.query_escaped}
+			redir @jwt_invalid_audience {http.vars.auth.portal.login.url}?reason=forbidden&redirectTo={extra.http.request.url.query_escaped}
+			redir @jwt_expired {http.vars.auth.portal.login.url}?reason=expired&redirectTo={extra.http.request.url.query_escaped}
+			redir * {http.vars.auth.portal.login.url}?redirectTo={extra.http.request.url.query_escaped}
+		}
+	}
+}
+
+auth.example.com {
+	handle * {
+		route {
+			error /favicon.ico 404
+			# Convenience redirects
+			redir /portal /portal.html
+			redir /logout /logout.html
+			# Other, unspecified requests go to portal.html, which is protected and requires a login (hence login.html)
+			redir * /portal.html
+		}
+	}
+
+	# Login-Endpoint with JWT-Issuer
+	handle /login {
+		@get_login {
+			method GET
+		}
+		redir @get_login /login.html
+
+		jwt_issuer {
+			user_db_path example-users.json
+			sign_key {file./path/to/jwt-secret.txt}
+			token_issuer https://auth.example.com
+			default_token_lifetime 1h
+			enable_cookie
+			cookie_name jwt_auth
+			cookie_domain .example.com
+		}
+	}
+
+	# Unprotected:
+	handle /login.html {
+		templates
+		file_server {
+			root ./html
+		}
+	}
+
+	# Protected Portal + Logout
+	@protected_html {
+		path /portal.html
+		path /logout.html
+	}
+	handle @protected_html {
+		jwtauth {
+			sign_key {file./path/to/jwt-secret.txt}
+			sign_alg HS256
+			issuer_whitelist https://auth.example.com
+			audience_whitelist "portal"
+			user_claims sub user
+			meta_claims "jti" "ip" "exp" "name" "app1" "app2" "app3"
+			from_cookies jwt_auth
+		}
+
+		route {
+			import snippet_check_token_blocklist
+
+			# Note:
+			# On Logout, the JTI is added to the file jti_blocklist.txt
+			# The directive placeholder_dump requires the caddy-placeholder-dump plugin (https://github.com/steffenbusch/caddy-placeholder-dump)
+			# Attention: You should not let this file grow indefinitely. If you change the jwtauth sign_key, clear the content of this file.
+			placeholder_dump /logout.html {
+				file jti_blocklist.txt
+				content "{http.auth.user.jti}"
+			}
+
+			# Additonally, delete the cookie
+			header /logout.html {
+				# Make sure this matches the issued cookie from Login Endpoint - especially regarding Domain.
+				# Otherwise, the cookie will not be deleted.
+				+Set-Cookie "jwt_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure=true; SameSite=Strict; Domain=.example.com"
+				+Set-Cookie "cpa_sess=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure=true; SameSite=Strict; Domain=.example.com"
+			}
+
+			templates
+			file_server /*.html {
+				root ./html
+			}
+		}
+	}
+
+	import snippet_handle_errors_401
+}
+
+app1.example.com {
+	handle /basic-auth-test {
+		vars isBasicAuth true
+		basic_auth {
+			# test:test
+			test "$2a$14$sheSqBaGYXckSKBI1l0T9eo4AtQF49mjoD8aHOHhXBss/h4fxaUYO"
+		}
+		respond "basic-auth-test passed"
+	}
+
+	handle {
+		jwtauth {
+			sign_key {file./path/to/jwt-secret.txt}
+			sign_alg HS256
+			issuer_whitelist https://auth.example.com
+			audience_whitelist "app1"
+			user_claims sub user
+			meta_claims "jti" "ip" "name"
+			from_cookies jwt_auth
+		}
+
+		import snippet_check_token_blocklist
+		reverse_proxy http://localhost:5000
+	}
+
+	import snippet_handle_errors_401
+}
+
+app2.example.com {
+	handle {
+		jwtauth {
+			sign_key {file./path/to/jwt-secret.txt}
+			sign_alg HS256
+			issuer_whitelist https://auth.example.com
+			audience_whitelist "app2"
+			user_claims sub user
+			meta_claims "jti" "ip" "name"
+			from_cookies jwt_auth
+		}
+
+		# Note:
+		# This directive, to require a 2FA (TOTP) after jwtauth, requires the caddy-postauth-2fa plugin (https://github.com/steffenbusch/caddy-postauth-2fa)
+		postauth_2fa {
+			sign_key {file./path/to/jwt-secret.txt}
+			session_inactivity_timeout 2h
+			secrets_file_path example-users.json
+			cookie_domain .example.com
+			cookie_name cpa_sess
+		}
+
+		import snippet_check_token_blocklist
+		import snippet_check_current_ip_not_jwt_ip
+
+		reverse_proxy http://localhost:5050
+	}
+
+	import snippet_handle_errors_401
+}

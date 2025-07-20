@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login-Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+        form {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            position: relative;
+            margin-top: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #message {
+            margin-top: 16px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: #d9534f;
+        }
+        #session-message {
+            color: #d9534f;
+            text-align: center;
+            margin-bottom: 16px;
+            max-width: 400px;
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {{- if eq (placeholder "http.request.uri.query.reason") "expired" }}
+        <div id="session-message">
+            <strong>Your session has expired</strong>
+        </div>
+        {{- end }}
+        {{- if eq (placeholder "http.request.uri.query.reason") "forbidden" }}
+        <div id="session-message">
+            <strong>Access Denied</strong><br>
+            You do not have permission to access the requested page.
+            Log in with another user if applicable.
+        </div>
+        {{- end }}
+        {{- if eq (placeholder "http.request.uri.query.reason") "token_blocked" }}
+        <div id="session-message">
+            <strong>Your session is no longer valid</strong><br>
+            You have been logged out. Please log in again to continue.
+        </div>
+        {{- end }}
+        {{- if eq (placeholder "http.request.uri.query.reason") "ip_mismatch" }}
+        <div id="session-message">
+            <strong>Session invalid due to IP address mismatch</strong><br>
+            Your current IP address differs from the one used during login. Please log in again.
+        </div>
+        {{- end }}
+        <form id="auth">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required autofocus>
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+
+            <button type="submit">Submit</button>
+
+            <div id="message"></div>
+        </form>
+    </div>
+
+    <script>
+        // Safe redirect function
+        function safeRedirect() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectTo = urlParams.get("redirectTo");
+            // Define allowed domains or domain suffixes
+            // Uncomment the line below to allow specific domains
+            //const allowedDomains = ["app1.example.com", "app2.example.com"]; // Add allowed domains here
+            const allowedDomainSuffixes = ["example.com"];
+
+            if (redirectTo) {
+                try {
+                    const decodedUrl = new URL(decodeURIComponent(redirectTo));
+                    const hostname = decodedUrl.hostname;
+                    // Uncomment the line below to check against specific domains
+                    //const isAllowed = allowedDomains.includes(hostname); // Check if hostname is in allowed domains
+                    const isAllowed = allowedDomainSuffixes.some(suffix =>
+                        hostname === suffix || // Check if hostname matches the suffix exactly
+                        hostname.endsWith("." + suffix) // Check if hostname ends with the suffix
+                    );
+                    if (isAllowed) {
+                        window.location.href = decodedUrl.href;
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Invalid redirectTo URL:", e);
+                }
+            }
+            // Fallback to a default URL if no redirectTo is found
+            // or if the domain is not allowed
+            window.location.href = "/portal.html";
+        }
+
+        document.getElementById("auth").addEventListener("submit", function (event) {
+            event.preventDefault(); // Prevent default form behavior
+
+            // Capture form data
+            const formData = new FormData(this);
+            const jsonObject = {};
+            formData.forEach((value, key) => {
+                jsonObject[key] = value;
+            });
+
+            // Send JSON data
+            fetch("/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(jsonObject)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data) {
+                        const messageElement = document.getElementById("message");
+                        if (data.message === "Success") {
+                            messageElement.textContent = "Login successful!";
+                            messageElement.className = "success";
+                            safeRedirect();
+                        } else {
+                            messageElement.textContent = data.message;
+                            messageElement.className = "error";
+                        }
+                    }
+                })
+                .catch(error => {
+                    const messageElement = document.getElementById("message");
+                    messageElement.textContent = "Error: " + error;
+                    messageElement.className = "error";
+                    console.error("Error:", error);
+                });
+        });
+    </script>
+</body>
+</html>

@@ -22,6 +22,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/steffenbusch/caddy-jwt-issuer/matchers"
 )
 
 // Initialize the module by registering it with Caddy
@@ -29,6 +30,8 @@ func init() {
 	caddy.RegisterModule(JWTIssuer{})
 	httpcaddyfile.RegisterHandlerDirective("jwt_issuer", parseCaddyfile)
 	httpcaddyfile.RegisterDirectiveOrder("jwt_issuer", "after", "basic_auth")
+	// Register the matcher
+	caddy.RegisterModule(matchers.TokenIsBlocked{})
 }
 
 // parseCaddyfile parses the Caddyfile configuration
@@ -48,6 +51,10 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		for d.NextBlock(0) {
 			param := d.Val()
 			var arg string
+			if param == "enable_cookie" {
+				m.EnableCookie = true
+				continue
+			}
 			if !d.Args(&arg) {
 				return d.ArgErr()
 			}
@@ -64,6 +71,10 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				m.UserDBPath = arg
 			case "token_issuer":
 				m.TokenIssuer = arg
+			case "cookie_name":
+				m.CookieName = arg
+			case "cookie_domain":
+				m.CookieDomain = arg
 			default:
 				return d.Errf("unknown subdirective: %s", param)
 			}

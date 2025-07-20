@@ -25,10 +25,12 @@ import (
 
 // user struct to hold username, password, audience, and token lifetime information
 type user struct {
-	Username      string
-	Password      string
-	Audience      []string
-	TokenLifetime *time.Duration
+	Username        string
+	Password        string
+	Audience        []string
+	TokenLifetime   *time.Duration
+	TokenValidUntil string
+	MetaClaims      map[string]any
 }
 
 type credentials struct {
@@ -72,9 +74,11 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 
 	// Temporary map to hold the data from the JSON file
 	tempUsers := make(map[string]struct {
-		Password      string   `json:"password"`
-		Audience      []string `json:"audience"`
-		TokenLifetime *string  `json:"token_lifetime"`
+		Password        string         `json:"password"`
+		Audience        []string       `json:"audience"`
+		TokenLifetime   *string        `json:"token_lifetime"`
+		TokenValidUntil string         `json:"token_valid_until"`
+		MetaClaims      map[string]any `json:"meta_claims"`
 	})
 
 	if err := json.Unmarshal(file, &tempUsers); err != nil {
@@ -99,10 +103,12 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 			tokenLifetime = &duration
 		}
 		m.users[username] = user{
-			Username:      username,
-			Password:      userData.Password,
-			Audience:      userData.Audience,
-			TokenLifetime: tokenLifetime,
+			Username:        username,
+			Password:        userData.Password,
+			Audience:        userData.Audience,
+			TokenLifetime:   tokenLifetime,
+			MetaClaims:      userData.MetaClaims,
+			TokenValidUntil: userData.TokenValidUntil,
 		}
 	}
 

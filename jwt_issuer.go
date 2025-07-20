@@ -26,8 +26,6 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -57,6 +55,15 @@ type JWTIssuer struct {
 	// Default JWT lifetime unless the user has a specific token lifetime
 	DefaultTokenLifetime time.Duration `json:"default_token_lifetime,omitempty"`
 
+	// EnableCookie determines whether a cookie will be set in the HTTP response containing the issued JWT.
+	EnableCookie bool `json:"enable_cookie,omitempty"`
+
+	// CookieName is the name of the cookie to be sent when the cookie query parameter is present
+	CookieName string `json:"cookie_name,omitempty"`
+
+	// CookieDomain is the domain for which the JWT cookie is set.
+	CookieDomain string `json:"cookie_domain,omitempty"`
+
 	// logger provides structured logging for the module.
 	logger *zap.Logger
 }
@@ -79,11 +86,24 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		m.usersMutex = &sync.RWMutex{}
 	}
 
+	// Apply a default value of 15 minutes if the default token lifetime is not set
+	if m.DefaultTokenLifetime == 0 {
+		m.DefaultTokenLifetime = 15 * time.Minute
+	}
+
+	// Apply a default cookie name if not set
+	if m.CookieName == "" {
+		m.CookieName = "jwt_auth"
+	}
+
 	// Log the configuration values. Ensure that sensitive data such as keys are not logged
 	m.logger.Info("JWT-Issuer plugin configured",
 		zap.String("User database path", m.UserDBPath),
 		zap.String("Token issuer", m.TokenIssuer),
 		zap.String("Default JWT lifetime", m.DefaultTokenLifetime.String()),
+		zap.String("Cookie name", m.CookieName),
+		zap.String("Cookie domain", m.CookieDomain),
+		zap.Bool("Enable JWT cookie", m.EnableCookie),
 	)
 
 	// Attempt to load users from the specified database path
@@ -128,11 +148,6 @@ func (m *JWTIssuer) Validate() error {
 	// Check that a token issuer is provided
 	if m.TokenIssuer == "" {
 		return fmt.Errorf("token issuer is required")
-	}
-
-	// Apply a default value of 15 minutes if the default token lifetime is not set
-	if m.DefaultTokenLifetime == 0 {
-		m.DefaultTokenLifetime = 15 * time.Minute
 	}
 
 	// Ensure the token lifetime is reasonable; for example, it should be positive
@@ -211,7 +226,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	}
 
 	// Create the JWT
-	tokenString, token, err := m.createJWT(userEntry)
+	tokenString, token, err := m.createJWT(userEntry, clientIP, r.Context())
 	logger = logger.With(zap.String("username", userEntry.Username))
 	if err != nil {
 		logger.Error("Failed to create JWT", zap.Error(err))
@@ -225,50 +240,27 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Log JWT details
 	logJWTDetails(logger, tokenString, token)
 
+	// Check if the JWT should be sent as a cookie in the HTTP response as well
+	if m.EnableCookie {
+		// Set the JWT as a cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     m.CookieName,
+			Value:    tokenString,
+			Path:     "/",
+			Domain:   m.CookieDomain,
+			HttpOnly: true,
+			Secure:   r.TLS != nil, // Set Secure to true only if HTTPS is used
+			SameSite: http.SameSiteStrictMode,
+		})
+
+	}
+
 	// Send the successful response with the JWT
 	jsonResponse(w, http.StatusOK, apiResponse{
 		Message: "Success",
 		Token:   tokenString,
 	})
 	return nil
-}
-
-func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
-	logger.Debug("Encoded JWT", zap.String("jwt", tokenString))
-
-	// Log the JWT claims
-	expirationTime := time.Unix(token.Claims.(jwt.MapClaims)["exp"].(int64), 0)
-	issuedAtTime := time.Unix(token.Claims.(jwt.MapClaims)["iat"].(int64), 0)
-	logger.Info("JWT claims",
-		zap.String("Subject", token.Claims.(jwt.MapClaims)["sub"].(string)),
-		zap.String("Issuer", token.Claims.(jwt.MapClaims)["iss"].(string)),
-		zap.Strings("Audience", token.Claims.(jwt.MapClaims)["aud"].([]string)),
-		zap.String("JWT ID", token.Claims.(jwt.MapClaims)["jti"].(string)),
-		zap.Time("Issued at", issuedAtTime),
-		zap.Time("Expiration time", expirationTime),
-	)
-}
-
-func (m *JWTIssuer) createJWT(user user) (string, *jwt.Token, error) {
-	// Determine the token lifetime to use. By default, use the module's token lifetime.
-	tokenLifetime := m.DefaultTokenLifetime
-	// If the user has a specific token lifetime, use that instead
-	if user.TokenLifetime != nil {
-		tokenLifetime = *user.TokenLifetime
-	}
-
-	claims := jwt.MapClaims{
-		"sub": user.Username,
-		"iss": m.TokenIssuer,    // Issuer (used by issuer_whitelist )
-		"aud": user.Audience,    // Audience (used by audience_whitelist)
-		"jti": uuid.NewString(), // JWT ID
-		"iat": time.Now().Unix(),
-		"nbf": time.Now().Unix(),
-		"exp": time.Now().Add(tokenLifetime).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(m.signKeyBytes)
-	return tokenString, token, err
 }
 
 // getClientIP retrieves the client IP address directly from the Caddy context.

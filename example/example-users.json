@@ -1,0 +1,29 @@
+{
+    "user1": {
+      "password": "$2a$14$WJZF09wcUcCjIp20VY2I7emMpwhFEs/7tssEKVazOq.fYE/pLV.ry",
+      "audience": [
+        "portal","app1","app2"
+      ],
+      "token_lifetime": "2h",
+      "meta_claims": {
+              "name": "Max Mustermann",
+              "app1": true,
+              "app2": true,
+              "app3": false
+      },
+      "comment": "Password is password1"
+    },
+    "user2": {
+      "password": "$2a$14$d5gFi3du/KTCXdAJSBcfD.AfhkLs6Jcz3BoSFqJ.saH87AWV1uobS",
+      "audience": [
+        "portal","app2"
+      ],
+      "token_valid_until": "tomorrow at 4:00 am",
+      "meta_claims": {
+        "app1": false,
+        "app2": true
+      },
+      "totp_secret": "JBSWY3DPEHPK3PXP",
+      "comment": "Password is password2 and the 2FA Code for login can be obtained here https://totp.danhersam.com/. Use https://github.com/steffenbusch/caddy-postauth-2fa for 2FA support after jwtauth."
+    }
+  }
