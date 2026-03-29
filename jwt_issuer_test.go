@@ -20,7 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func createTestUserDBFile(t *testing.T, users map[string]user) string {
+func createTestUserDBFile(t *testing.T, users any) string {
 	t.Helper()
 	tmpfile, err := os.CreateTemp("", "userdb-*.json")
 	if err != nil {
@@ -39,11 +39,10 @@ func TestJWTIssuer_Provision_Validate(t *testing.T) {
 	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
 	// Create a bcrypt password hash
 	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
-	users := map[string]user{
-		"alice": {
-			Username: "alice",
-			Password: string(pw),
-			Audience: []string{"testaud"},
+	users := map[string]any{
+		"alice": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
@@ -73,11 +72,10 @@ func TestJWTIssuer_Provision_Validate(t *testing.T) {
 func TestJWTIssuer_ServeHTTP_Success(t *testing.T) {
 	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
 	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
-	users := map[string]user{
-		"bob": {
-			Username: "bob",
-			Password: string(pw),
-			Audience: []string{"testaud"},
+	users := map[string]any{
+		"bob": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
@@ -148,11 +146,10 @@ func TestJWTIssuer_ServeHTTP_Success(t *testing.T) {
 func TestJWTIssuer_ServeHTTP_BadPassword(t *testing.T) {
 	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
 	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
-	users := map[string]user{
-		"bob": {
-			Username: "bob",
-			Password: string(pw),
-			Audience: []string{"testaud"},
+	users := map[string]any{
+		"bob": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
@@ -181,6 +178,8 @@ func TestJWTIssuer_ServeHTTP_BadPassword(t *testing.T) {
 		"client_ip": "10.1.2.3",
 	}
 	ctx := context.WithValue(req.Context(), caddyhttp.VarsCtxKey, caddyVars)
+	repl := caddy.NewReplacer()
+	ctx = context.WithValue(ctx, caddy.ReplacerCtxKey, repl)
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
@@ -194,14 +193,104 @@ func TestJWTIssuer_ServeHTTP_BadPassword(t *testing.T) {
 	}
 }
 
+func TestJWTIssuer_ServeHTTP_TokenIssuanceDisabled(t *testing.T) {
+	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
+	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
+	pastTime := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
+	futureTime := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
+
+	users := map[string]any{
+		"normal_user": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
+		},
+		"disabled_user": map[string]any{
+			"password":                      string(pw),
+			"audience":                      []string{"testaud"},
+			"token_issuance_disabled_after": pastTime,
+		},
+		"active_user": map[string]any{
+			"password":                      string(pw),
+			"audience":                      []string{"testaud"},
+			"token_issuance_disabled_after": futureTime,
+		},
+	}
+	userDB := createTestUserDBFile(t, users)
+	defer os.Remove(userDB)
+
+	issuer := &JWTIssuer{
+		SignKey:              signKey,
+		UserDBPath:           userDB,
+		TokenIssuer:          "test-issuer",
+		DefaultTokenLifetime: 10 * time.Minute,
+	}
+	issuer.logger = zaptest.NewLogger(t)
+	var stubCaddyCtx caddy.Context
+	if err := issuer.Provision(stubCaddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+
+	// Test case 1: User without any restriction
+	payload := map[string]any{
+		"username": "normal_user",
+		"password": "testpass",
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/jwt", bytes.NewReader(body))
+
+	caddyVars := map[string]any{
+		"client_ip": "10.1.2.3",
+	}
+	ctx := context.WithValue(req.Context(), caddyhttp.VarsCtxKey, caddyVars)
+	repl := caddy.NewReplacer()
+	ctx = context.WithValue(ctx, caddy.ReplacerCtxKey, repl)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	err := issuer.ServeHTTP(rr, req, nil)
+	if err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 OK for normal user, but got %d", rr.Code)
+	}
+
+	// Test case 2: User with token issuance disabled
+	payload["username"] = "disabled_user"
+	body, _ = json.Marshal(payload)
+	req = httptest.NewRequest(http.MethodPost, "/jwt", bytes.NewReader(body))
+	req = req.WithContext(ctx)
+	rr = httptest.NewRecorder()
+	err = issuer.ServeHTTP(rr, req, nil)
+	if err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected status 401 Unauthorized for disabled user, but got %d", rr.Code)
+	}
+
+	// Test case 3: User with token issuance not yet disabled
+	payload["username"] = "active_user"
+	body, _ = json.Marshal(payload)
+	req = httptest.NewRequest(http.MethodPost, "/jwt", bytes.NewReader(body))
+	req = req.WithContext(ctx)
+	rr = httptest.NewRecorder()
+	err = issuer.ServeHTTP(rr, req, nil)
+	if err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 OK for active user, but got %d", rr.Code)
+	}
+}
+
 func TestCaddyfileJWTIssuer(t *testing.T) {
 	// Create a temporary user DB file for the test
 	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
-	users := map[string]user{
-		"testuser": {
-			Username: "testuser",
-			Password: string(pw),
-			Audience: []string{"testaud"},
+	users := map[string]any{
+		"testuser": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
 		},
 	}
 	userDB := createTestUserDBFile(t, users)

@@ -225,6 +225,16 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return nil
 	}
 
+	// Check if token issuance is disabled for this user
+	if userEntry.TokenIssuanceDisabledAfter != nil && time.Now().After(*userEntry.TokenIssuanceDisabledAfter) {
+		logger.Warn("Authentication failed due to token issuance disabled for user",
+			zap.String("username", providedCredentials.Username),
+			zap.Time("disabled_after", *userEntry.TokenIssuanceDisabledAfter),
+		)
+		jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
+		return nil
+	}
+
 	// Create the JWT
 	tokenString, token, err := m.createJWT(userEntry, clientIP, r.Context())
 	logger = logger.With(zap.String("username", userEntry.Username))
