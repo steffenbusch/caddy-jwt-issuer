@@ -40,6 +40,7 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
             enable_cookie
             cookie_name <cookie-name>
             cookie_domain <cookie-domain>
+            omit_token_in_response
         }
     }
 }
@@ -57,6 +58,7 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
   - `enable_cookie`: If this option is present, the plugin will set a cookie in the HTTP response containing the issued JWT.
   - `cookie_name`: The name of the cookie used to store the JWT. Defaults to `jwt_auth` if not specified.
   - `cookie_domain`: The domain for which the cookie is valid. For example, `.example.com` makes the cookie valid for all subdomains of `example.com`.
+  - `omit_token_in_response`: If this option is present, the JWT will not be included in the JSON response body. This is useful when the token is only delivered via cookie.
 - **`token_is_blocked`**:
   - `blocklist_file`: Path to the blocklist file containing revoked tokens (one token per line). The file is automatically reloaded when modified.
   - `placeholder`: Placeholder containing the token to check (e.g., `{http.auth.user.jti}`). Defaults to `{http.auth.user.jti}`.

@@ -55,6 +55,10 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				m.EnableCookie = true
 				continue
 			}
+			if param == "omit_token_in_response" {
+				m.OmitTokenInResponse = true
+				continue
+			}
 			if !d.Args(&arg) {
 				return d.ArgErr()
 			}
