@@ -120,6 +120,7 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
        "admin-endpoint"
      ],
      "token_valid_until": "tomorrow at 4:00 am",
+     "token_issuance_disabled_after": "2026-12-06T18:30:00Z",
      "totp_secret": "JBSWY3DPEHPK3PXP",
      "meta_claims": {
        "name": "Alice Example",
@@ -127,7 +128,7 @@ Here is a sample `users.json` file that can be used with the caddy-jwt-issuer pl
        "app2": true,
        "app3": false
      },
-     "comment": "For security, do not use plaintext passwords in comments as demonstrated above. Use https://github.com/steffenbusch/caddy-postauth-2fa for 2FA support after jwtauth."
+     "comment": "For security, do not use plaintext passwords in comments as demonstrated above. Use https://github.com/steffenbusch/caddy-postauth-2fa for 2FA support after jwtauth. After 2026-12-06T18:30:00Z (UTC), no more JWTs will be issued for this account."
    }
 }
 ```
@@ -137,7 +138,8 @@ This example demonstrates the following configuration options:
 - `"password"`: The bcrypt hash of the user's password.
 - `"audience"`: A list of audiences the user has access to.
 - `"token_lifetime"` (optional): Specifies the lifetime of the token for this user (e.g., "1h"). If present, it will override the `default_token_lifetime` configured for the plugin.
-- `"token_valid_until"` (optional): A specific expiration time for the token (e.g., "tomorrow at 4:00 am"). If present, it will override both the `"token_lifetime"` for the user and the `default_token_lifetime` configured for the plugin. This field supports natural language date/time parsing using [when](https://github.com/olebedev/when). For more information, refer to the [when documentation](https://github.com/olebedev/when).
+- `"token_valid_until"` (optional): A specific expiration time for the token (e.g., "tomorrow at 4:00 am"). If present, it will override both the `"token_lifetime"` for the user and the `default_token_lifetime` configured for the plugin. This field supports natural language date/time parsing using [when](https://github.com/olebedev/when). Please note that the time is interpreted relative to the Caddy server's system time and time zone. For more information, refer to the [when documentation](https://github.com/olebedev/when).
+- `"token_issuance_disabled_after"` (optional): A timestamp in RFC3339 format (e.g., "2026-12-06T18:30:00Z"). If this timestamp is in the past, no new JWT will be issued for the user, even with correct credentials. This can be used to temporarily or permanently disable an account.
 - `"meta_claims"` (optional): Additional claims to include in the token, such as:
   - `"name"`: The user's full name.
 

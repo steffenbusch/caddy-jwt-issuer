@@ -25,12 +25,13 @@ import (
 
 // user struct to hold username, password, audience, and token lifetime information
 type user struct {
-	Username        string
-	Password        string
-	Audience        []string
-	TokenLifetime   *time.Duration
-	TokenValidUntil string
-	MetaClaims      map[string]any
+	Username                   string
+	Password                   string
+	Audience                   []string
+	TokenLifetime              *time.Duration
+	TokenValidUntil            string
+	TokenIssuanceDisabledAfter *time.Time
+	MetaClaims                 map[string]any
 }
 
 type credentials struct {
@@ -74,11 +75,12 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 
 	// Temporary map to hold the data from the JSON file
 	tempUsers := make(map[string]struct {
-		Password        string         `json:"password"`
-		Audience        []string       `json:"audience"`
-		TokenLifetime   *string        `json:"token_lifetime"`
-		TokenValidUntil string         `json:"token_valid_until"`
-		MetaClaims      map[string]any `json:"meta_claims"`
+		Password                   string         `json:"password"`
+		Audience                   []string       `json:"audience"`
+		TokenLifetime              *string        `json:"token_lifetime"`
+		TokenValidUntil            string         `json:"token_valid_until"`
+		TokenIssuanceDisabledAfter *string        `json:"token_issuance_disabled_after"`
+		MetaClaims                 map[string]any `json:"meta_claims"`
 	})
 
 	if err := json.Unmarshal(file, &tempUsers); err != nil {
@@ -98,17 +100,28 @@ func (m *JWTIssuer) loadUsers(filePath string) error {
 		if userData.TokenLifetime != nil {
 			duration, err := time.ParseDuration(*userData.TokenLifetime)
 			if err != nil {
-				return fmt.Errorf("invalid token lifetime format for user %s: %v", username, err)
+				return fmt.Errorf("invalid token_lifetime %q for user %s: expected duration like \"1h\", \"30m\", or \"24h\": %w", *userData.TokenLifetime, username, err)
 			}
 			tokenLifetime = &duration
 		}
+
+		var tokenIssuanceDisabledAfter *time.Time
+		if userData.TokenIssuanceDisabledAfter != nil {
+			parsedTime, err := time.Parse(time.RFC3339, *userData.TokenIssuanceDisabledAfter)
+			if err != nil {
+				return fmt.Errorf("failed to parse token_issuance_disabled_after timestamp for user %s: expected RFC3339 format, got %q: %w", username, *userData.TokenIssuanceDisabledAfter, err)
+			}
+			tokenIssuanceDisabledAfter = &parsedTime
+		}
+
 		m.users[username] = user{
-			Username:        username,
-			Password:        userData.Password,
-			Audience:        userData.Audience,
-			TokenLifetime:   tokenLifetime,
-			MetaClaims:      userData.MetaClaims,
-			TokenValidUntil: userData.TokenValidUntil,
+			Username:                   username,
+			Password:                   userData.Password,
+			Audience:                   userData.Audience,
+			TokenLifetime:              tokenLifetime,
+			TokenValidUntil:            userData.TokenValidUntil,
+			TokenIssuanceDisabledAfter: tokenIssuanceDisabledAfter,
+			MetaClaims:                 userData.MetaClaims,
 		}
 	}
 
