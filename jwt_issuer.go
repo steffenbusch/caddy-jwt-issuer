@@ -64,6 +64,9 @@ type JWTIssuer struct {
 	// CookieDomain is the domain for which the JWT cookie is set.
 	CookieDomain string `json:"cookie_domain,omitempty"`
 
+	// OmitTokenInResponse, if true, prevents the JWT from being included in the JSON response body.
+	OmitTokenInResponse bool `json:"omit_token_in_response,omitempty"`
+
 	// logger provides structured logging for the module.
 	logger *zap.Logger
 }
@@ -104,6 +107,7 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		zap.String("Cookie name", m.CookieName),
 		zap.String("Cookie domain", m.CookieDomain),
 		zap.Bool("Enable JWT cookie", m.EnableCookie),
+		zap.Bool("Omit token in response", m.OmitTokenInResponse),
 	)
 
 	// Attempt to load users from the specified database path
@@ -154,6 +158,12 @@ func (m *JWTIssuer) Validate() error {
 	if m.DefaultTokenLifetime <= 0 {
 		return fmt.Errorf("default token lifetime must be a positive duration")
 	}
+
+	// Warn if the token is omitted from the response but cookies are not enabled
+	if m.OmitTokenInResponse && !m.EnableCookie {
+		m.logger.Warn("omit_token_in_response is enabled but enable_cookie is false; token will not be returned to the client")
+	}
+
 	return nil
 }
 
@@ -262,14 +272,19 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 			Secure:   r.TLS != nil, // Set Secure to true only if HTTPS is used
 			SameSite: http.SameSiteStrictMode,
 		})
-
 	}
 
-	// Send the successful response with the JWT
-	jsonResponse(w, http.StatusOK, apiResponse{
+	// Send the successful response
+	response := apiResponse{
 		Message: "Success",
-		Token:   tokenString,
-	})
+	}
+
+	// Only include the token in the response if OmitTokenInResponse is false
+	if !m.OmitTokenInResponse {
+		response.Token = tokenString
+	}
+
+	jsonResponse(w, http.StatusOK, response)
 	return nil
 }
 

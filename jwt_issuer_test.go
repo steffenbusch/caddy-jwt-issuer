@@ -143,6 +143,85 @@ func TestJWTIssuer_ServeHTTP_Success(t *testing.T) {
 	}
 }
 
+func TestJWTIssuer_ServeHTTP_OmitToken(t *testing.T) {
+	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
+	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
+	users := map[string]any{
+		"bob": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
+		},
+	}
+	userDB := createTestUserDBFile(t, users)
+	defer os.Remove(userDB)
+
+	issuer := &JWTIssuer{
+		SignKey:              signKey,
+		UserDBPath:           userDB,
+		TokenIssuer:          "test-issuer",
+		DefaultTokenLifetime: 10 * time.Minute,
+		EnableCookie:         true,
+		OmitTokenInResponse:  true, // This is the focus of the test
+		CookieName:           "jwt_auth",
+	}
+	issuer.logger = zaptest.NewLogger(t)
+	var stubCaddyCtx caddy.Context
+	if err := issuer.Provision(stubCaddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+
+	// Prepare request
+	body, _ := json.Marshal(credentials{
+		Username: "bob",
+		Password: "testpass",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/jwt", bytes.NewReader(body))
+
+	// Injecting mock Caddy context
+	caddyVars := map[string]any{
+		"client_ip": "10.1.2.3",
+	}
+	ctx := context.WithValue(req.Context(), caddyhttp.VarsCtxKey, caddyVars)
+	repl := caddy.NewReplacer()
+	ctx = context.WithValue(ctx, caddy.ReplacerCtxKey, repl)
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+
+	// ServeHTTP should succeed
+	err := issuer.ServeHTTP(rr, req, nil)
+	if err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rr.Code)
+	}
+
+	// Check that the token is NOT in the response body
+	var resp apiResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if resp.Token != "" {
+		t.Error("Expected token to be omitted from response, but it was present")
+	}
+	if resp.Message != "Success" {
+		t.Errorf("Expected message 'Success', got '%s'", resp.Message)
+	}
+
+	// Check that the cookie IS set
+	found := false
+	for _, c := range rr.Result().Cookies() {
+		if c.Name == "jwt_auth" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("JWT cookie not set, even though EnableCookie was true")
+	}
+}
+
 func TestJWTIssuer_ServeHTTP_BadPassword(t *testing.T) {
 	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
 	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
