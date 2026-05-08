@@ -53,11 +53,11 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
     - *Usage Tip*: To create a secure base64-encoded sign key, you can use the command `openssl rand -base64 32`. This command generates a random 32-byte key and encodes it in base64 format.
     - *Placeholder Support*: You can also use a placeholder to reference a file containing the key, such as `{file./path/to/jwt-secret.txt}`. The file's content will be read and used as the signing key.
   - `user_db_path`: The path to the user database JSON file containing username, password, audience information, and optional deviating token lifetime. See the [example](#sample-usersjson) at the end of this README.
-  - `token_issuer`: The issuer name to be included in the JWTs.
+  - `token_issuer`: The issuer name to be included in the JWTs. Supports placeholders.
   - `default_token_lifetime`: The lifetime of the issued JWTs (e.g., "1h" for 1 hour). If not configured, the default value is 15 minutes.
   - `enable_cookie`: If this option is present, the plugin will set a cookie in the HTTP response containing the issued JWT.
-  - `cookie_name`: The name of the cookie used to store the JWT. Defaults to `jwt_auth` if not specified.
-  - `cookie_domain`: The domain for which the cookie is valid. For example, `.example.com` makes the cookie valid for all subdomains of `example.com`.
+  - `cookie_name`: The name of the cookie used to store the JWT. Defaults to `jwt_auth` if not specified. Supports placeholders.
+  - `cookie_domain`: The domain for which the cookie is valid. For example, `.example.com` makes the cookie valid for all subdomains of `example.com`. Supports placeholders.
   - `omit_token_in_response`: If this option is present, the JWT will not be included in the JSON response body. This is useful when the token is only delivered via cookie.
 - **`token_is_blocked`**:
   - `blocklist_file`: Path to the blocklist file containing revoked tokens (one token per line). The file is automatically reloaded when modified.

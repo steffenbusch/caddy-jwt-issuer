@@ -84,6 +84,11 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger()
 	repl := caddy.NewReplacer()
 
+	// Replace placeholders in configuration fields
+	m.TokenIssuer = repl.ReplaceAll(m.TokenIssuer, "")
+	m.CookieName = repl.ReplaceAll(m.CookieName, "")
+	m.CookieDomain = repl.ReplaceAll(m.CookieDomain, "")
+
 	// Initialize the mutex if it's nil
 	if m.usersMutex == nil {
 		m.usersMutex = &sync.RWMutex{}
