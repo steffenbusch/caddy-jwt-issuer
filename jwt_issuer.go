@@ -175,6 +175,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Create logger with common fields
 	logger := m.logger.With(
 		zap.String("client_ip", clientIP),
+		zap.String("token_issuer", m.TokenIssuer),
 	)
 
 	logger.Debug("Received JWT issuance request",
