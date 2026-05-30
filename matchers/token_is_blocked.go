@@ -164,6 +164,10 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
 	// Atomically store the new map
 	m.blocked.Store(newMap)
 
