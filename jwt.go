@@ -16,6 +16,7 @@ package jwtissuer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -138,8 +139,11 @@ func (m *JWTIssuer) createJWT(user user, clientIP string, ctx context.Context) (
 		"ip":  clientIP, // Include client IP as a claim
 	}
 
-	// Fetch replacer from the request context
-	repl := ctx.Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	// Fetch replacer from the request context. Caddy normally provides this; fail closed if it is missing.
+	repl, ok := ctx.Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	if !ok || repl == nil {
+		return "", nil, fmt.Errorf("caddy replacer missing from request context")
+	}
 
 	// Add meta_claims to the JWT claims, excluding predefined claims
 	for key, value := range user.MetaClaims {

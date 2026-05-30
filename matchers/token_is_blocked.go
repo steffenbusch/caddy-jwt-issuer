@@ -121,7 +121,13 @@ func (m *TokenIsBlocked) Cleanup() error {
 }
 
 func (m *TokenIsBlocked) Match(r *http.Request) bool {
-	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	repl, ok := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	if !ok || repl == nil {
+		if m.logger != nil {
+			m.logger.Warn("No Caddy replacer found in request context", zap.String("placeholder", m.Placeholder))
+		}
+		return false
+	}
 	token := repl.ReplaceAll(m.Placeholder, "")
 
 	if token == "" {

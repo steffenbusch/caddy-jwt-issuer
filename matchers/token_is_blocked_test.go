@@ -70,6 +70,18 @@ func TestTokenIsBlocked_Match(t *testing.T) {
 	}
 }
 
+func TestTokenIsBlocked_MissingReplacerContext(t *testing.T) {
+	m := &TokenIsBlocked{
+		Placeholder: "{token}",
+	}
+	m.logger = zaptest.NewLogger(t)
+	req, _ := http.NewRequest("GET", "/", nil)
+
+	if m.Match(req) {
+		t.Fatal("Expected missing replacer context to not match")
+	}
+}
+
 func TestTokenIsBlocked_UnmarshalCaddyfile(t *testing.T) {
 	input := `
 	token_is_blocked {

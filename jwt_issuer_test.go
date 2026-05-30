@@ -228,6 +228,59 @@ func TestJWTIssuer_ServeHTTP_OmitToken(t *testing.T) {
 	}
 }
 
+func TestJWTIssuer_ServeHTTP_MissingReplacerContext(t *testing.T) {
+	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
+	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
+	users := map[string]any{
+		"bob": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
+		},
+	}
+	userDB := createTestUserDBFile(t, users)
+	defer os.Remove(userDB)
+
+	issuer := &JWTIssuer{
+		SignKey:              signKey,
+		UserDBPath:           userDB,
+		TokenIssuer:          "test-issuer",
+		DefaultTokenLifetime: 10 * time.Minute,
+	}
+	issuer.logger = zaptest.NewLogger(t)
+	var stubCaddyCtx caddy.Context
+	if err := issuer.Provision(stubCaddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+
+	body, _ := json.Marshal(credentials{
+		Username: "bob",
+		Password: "testpass",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/jwt", bytes.NewReader(body))
+	ctx := context.WithValue(req.Context(), caddyhttp.VarsCtxKey, map[string]any{
+		"client_ip": "10.1.2.3",
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	if err := issuer.ServeHTTP(rr, req, nil); err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("Expected 500 Internal Server Error, got %d", rr.Code)
+	}
+}
+
+func TestGetClientIPFallbacks(t *testing.T) {
+	ctx := context.Background()
+	if got := getClientIP(ctx, "192.0.2.10:12345"); got != "192.0.2.10" {
+		t.Fatalf("Expected host from RemoteAddr, got %q", got)
+	}
+	if got := getClientIP(ctx, "not-a-host-port"); got != "not-a-host-port" {
+		t.Fatalf("Expected raw RemoteAddr fallback, got %q", got)
+	}
+}
+
 func TestJWTIssuer_ServeHTTP_BadPassword(t *testing.T) {
 	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
 	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)

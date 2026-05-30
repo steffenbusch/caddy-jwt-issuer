@@ -291,20 +291,20 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 
 // getClientIP retrieves the client IP address directly from the Caddy context.
 func getClientIP(ctx context.Context, remoteAddr string) string {
-	clientIP, ok := ctx.Value(caddyhttp.VarsCtxKey).(map[string]any)["client_ip"]
-	if ok {
-		if ip, valid := clientIP.(string); valid {
-			return ip
+	// Prefer the client IP that Caddy resolved into the request context.
+	if vars, ok := ctx.Value(caddyhttp.VarsCtxKey).(map[string]any); ok {
+		if clientIP, ok := vars["client_ip"].(string); ok && clientIP != "" {
+			return clientIP
 		}
 	}
-	// If the client IP is empty, extract it from the request's RemoteAddr.
-	var err error
-	clientIP, _, err = net.SplitHostPort(remoteAddr)
+
+	// If the Caddy context value is missing, extract the host from RemoteAddr.
+	clientIP, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
 		// Use the complete RemoteAddr string as a last resort.
-		clientIP = remoteAddr
+		return remoteAddr
 	}
-	return clientIP.(string)
+	return clientIP
 }
 
 // Interface guards to ensure JWTIssuer implements the necessary interfaces.
