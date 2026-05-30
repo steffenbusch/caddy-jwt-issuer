@@ -24,8 +24,9 @@ import (
 type TokenIsBlocked struct {
 	// BlocklistFile is the path to the blocklist file.
 	// Each line in the file should contain a token to be blocked, optionally followed by
-	// a Unix expiration timestamp: "<token>" or "<token> <exp>". Expired entries
-	// are skipped while loading so old revocations do not consume memory indefinitely.
+	// an expiration timestamp: "<token>" or "<token> <exp>". The expiration may be
+	// Unix seconds or RFC3339/RFC3339Nano. Expired entries are skipped while loading
+	// so old revocations do not consume memory indefinitely.
 	// If the file does not exist, it will be created.
 	// The file is reloaded when it changes.
 	BlocklistFile string `json:"blocklist_file,omitempty"`
@@ -159,7 +160,7 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 
 	scanner := bufio.NewScanner(file)
 	newMap := make(map[string]struct{})
-	now := time.Now().Unix()
+	now := time.Now()
 	skippedExpired := 0
 	malformedExp := 0
 
@@ -173,7 +174,7 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 
 		token := fields[0]
 		if len(fields) > 1 {
-			exp, err := strconv.ParseInt(fields[1], 10, 64)
+			exp, err := parseBlocklistExpiration(fields[1])
 			if err != nil {
 				// Fail closed: a bad optional expiration must not accidentally unblock the token.
 				malformedExp++
@@ -185,8 +186,8 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 						zap.Error(err),
 					)
 				}
-			} else if exp <= now {
-				// JWT exp is exclusive: a token is expired at or after this Unix timestamp.
+			} else if !exp.After(now) {
+				// JWT exp is exclusive: a token is expired at or after this timestamp.
 				skippedExpired++
 				continue
 			}
@@ -213,6 +214,18 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 		)
 	}
 	return nil
+}
+
+func parseBlocklistExpiration(value string) (time.Time, error) {
+	if unixExp, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return time.Unix(unixExp, 0), nil
+	}
+
+	if exp, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return exp, nil
+	}
+
+	return time.Time{}, fmt.Errorf("expiration must be Unix seconds or RFC3339 timestamp")
 }
 
 func (m *TokenIsBlocked) watchDirectoryLoop() {

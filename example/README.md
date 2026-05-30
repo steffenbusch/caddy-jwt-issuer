@@ -46,7 +46,7 @@ A folder containing static HTML files for the login, logout, and portal pages:
 
 2. **Update Configuration**:
    - Adjust placeholders in the `Caddyfile` (e.g., `{file./path/to/jwt-secret.txt}`) with actual values.
-   - Configure the `blocklist_file` option in the `token_is_blocked` matcher to specify the path to the blocklist file. The example writes lines as `<jti> <exp>` so the matcher can skip already expired revocations in memory while remaining compatible with older one-JTI-per-line files.
+   - Configure the `blocklist_file` option in the `token_is_blocked` matcher to specify the path to the blocklist file. The example writes lines as `<jti> <exp>` using the RFC3339 value exposed by `{http.auth.user.exp}`, so the matcher can skip already expired revocations in memory while remaining compatible with older one-JTI-per-line files.
 
 3. **Start Caddy**:
    - Run the Caddy server using the provided `Caddyfile`.
@@ -58,7 +58,7 @@ A folder containing static HTML files for the login, logout, and portal pages:
 ## Notes
 
 - The `jwt_issuer` directive is responsible for issuing tokens, while the `jwtauth` directive validates them.
-- The `token_is_blocked` matcher ensures that revoked tokens are blocked by referencing a blocklist file. It reads the first whitespace-separated field as the token/JTI and optionally uses the second field as the JWT expiration timestamp.
+- The `token_is_blocked` matcher ensures that revoked tokens are blocked by referencing a blocklist file. It reads the first whitespace-separated field as the token/JTI and optionally uses the second field as the JWT expiration timestamp. Expiration values may be Unix seconds or RFC3339/RFC3339Nano timestamps.
 - The `extra-placeholders` module is used to handle redirection with query parameters.
 - Ensure the `example-users.json` file and the blocklist file are properly secured and not exposed publicly.
 
