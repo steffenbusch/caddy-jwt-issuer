@@ -34,6 +34,26 @@ func createTestUserDBFile(t *testing.T, users any) string {
 	return tmpfile.Name()
 }
 
+func TestMaskTokenForLog(t *testing.T) {
+	tests := []struct {
+		name  string
+		token string
+		want  string
+	}{
+		{name: "short token redacted", token: "short-token", want: "[redacted]"},
+		{name: "boundary length redacted", token: "123456789012345678901234", want: "[redacted]"},
+		{name: "long token keeps fixed tail", token: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", want: "[redacted]…CDEFGHIJKLMNOPQRSTUVWXYZ"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := maskTokenForLog(tt.token); got != tt.want {
+				t.Fatalf("maskTokenForLog() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestJWTIssuer_Provision_Validate(t *testing.T) {
 	// Create a dummy sign key (32 bytes, base64)
 	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
