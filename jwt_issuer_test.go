@@ -121,6 +121,12 @@ func TestJWTIssuer_ServeHTTP_Success(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", rr.Code)
 	}
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Expected Cache-Control no-store, got %q", got)
+	}
+	if got := rr.Header().Get("Pragma"); got != "no-cache" {
+		t.Fatalf("Expected Pragma no-cache, got %q", got)
+	}
 
 	var resp apiResponse
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
