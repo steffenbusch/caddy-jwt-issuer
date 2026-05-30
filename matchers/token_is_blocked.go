@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
-
-	"net/http"
+	"time"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -22,7 +23,9 @@ import (
 // It uses a file watcher to reload the blocklist when the file changes.
 type TokenIsBlocked struct {
 	// BlocklistFile is the path to the blocklist file.
-	// Each line in the file should contain a token to be blocked.
+	// Each line in the file should contain a token to be blocked, optionally followed by
+	// a Unix expiration timestamp: "<token>" or "<token> <exp>". Expired entries
+	// are skipped while loading so old revocations do not consume memory indefinitely.
 	// If the file does not exist, it will be created.
 	// The file is reloaded when it changes.
 	BlocklistFile string `json:"blocklist_file,omitempty"`
@@ -156,25 +159,59 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 
 	scanner := bufio.NewScanner(file)
 	newMap := make(map[string]struct{})
+	now := time.Now().Unix()
+	skippedExpired := 0
+	malformedExp := 0
 
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			newMap[line] = struct{}{}
+		// Supported line formats are "<token>" and "<token> <exp>".
+		// The first field is always the token value used for blocklist matching.
+		fields := strings.Fields(scanner.Text())
+		if len(fields) == 0 {
+			continue
 		}
+
+		token := fields[0]
+		if len(fields) > 1 {
+			exp, err := strconv.ParseInt(fields[1], 10, 64)
+			if err != nil {
+				// Fail closed: a bad optional expiration must not accidentally unblock the token.
+				malformedExp++
+				if m.logger != nil {
+					m.logger.Warn("Ignoring malformed blocklist expiration and keeping token blocked",
+						zap.String("file", m.BlocklistFile),
+						zap.String("token", token),
+						zap.String("expiration", fields[1]),
+						zap.Error(err),
+					)
+				}
+			} else if exp <= now {
+				// JWT exp is exclusive: a token is expired at or after this Unix timestamp.
+				skippedExpired++
+				continue
+			}
+		}
+
+		// Add the token to the in-memory blocklist unless a valid exp field proved it expired.
+		newMap[token] = struct{}{}
 	}
 
 	if err := scanner.Err(); err != nil {
 		return err
 	}
 
-	// Atomically store the new map
+	// Atomically store the new map. The blocklist file remains read-only from this matcher;
+	// external housekeeping can compact expired lines on disk when appropriate.
 	m.blocked.Store(newMap)
 
-	m.logger.Info("Blocklist reloaded",
-		zap.String("file", m.BlocklistFile),
-		zap.Int("entries", len(newMap)),
-	)
+	if m.logger != nil {
+		m.logger.Info("Blocklist reloaded",
+			zap.String("file", m.BlocklistFile),
+			zap.Int("entries", len(newMap)),
+			zap.Int("skipped_expired_entries", skippedExpired),
+			zap.Int("malformed_expiration_entries", malformedExp),
+		)
+	}
 	return nil
 }
 
