@@ -144,6 +144,8 @@ func (m *TokenIsBlocked) Match(r *http.Request) bool {
 	_, blocked := blockedMap[token]
 
 	if blocked {
+		// The default placeholder resolves to the JWT ID (JTI), not the encoded JWT.
+		// If a custom placeholder is configured, this log field contains that configured blocklist value.
 		m.logger.Info("Token is in the blocklist", zap.String("token", token))
 		return true
 	}
