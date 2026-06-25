@@ -40,6 +40,7 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
             enable_cookie
             cookie_name <cookie-name>
             cookie_domain <cookie-domain>
+            cookie_extension_time <duration>
             omit_token_in_response
         }
     }
@@ -58,6 +59,7 @@ To use the caddy-jwt-issuer plugin, add the following directive to your Caddyfil
   - `enable_cookie`: If this option is present, the plugin will set a cookie in the HTTP response containing the issued JWT.
   - `cookie_name`: The name of the cookie used to store the JWT. Defaults to `jwt_auth` if not specified.
   - `cookie_domain`: The domain for which the cookie is valid. For example, `.example.com` makes the cookie valid for all subdomains of `example.com`.
+  - `cookie_extension_time`: Additional time the cookie remains valid after JWT expiration. This allows clients to send the expired JWT back to receive a clear "token expired" error message instead of a silent redirect. If not configured, the cookie will not have an explicit expiration and will be removed when the browser session ends. Specify as a duration (e.g., "5m" for 5 minutes).
   - `omit_token_in_response`: If this option is present, the JWT will not be included in the JSON response body. This is useful when the token is only delivered via cookie.
 - **`token_is_blocked`**:
   - `blocklist_file`: Path to the blocklist file containing revoked tokens. Each line may contain just the token/JTI for backward compatibility, or the token/JTI followed by an expiration timestamp, e.g. `<jti> <exp>`. The expiration may be Unix seconds or RFC3339/RFC3339Nano. The file is automatically reloaded when modified. Entries with an expiration timestamp in the past are skipped when loaded into memory.

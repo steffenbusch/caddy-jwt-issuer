@@ -64,6 +64,10 @@ type JWTIssuer struct {
 	// CookieDomain is the domain for which the JWT cookie is set.
 	CookieDomain string `json:"cookie_domain,omitempty"`
 
+	// CookieExtensionTime is the additional time the cookie remains valid after the JWT expires.
+	// This allows clients to send the expired JWT back for a better error message instead of silent redirect.
+	CookieExtensionTime time.Duration `json:"cookie_extension_time,omitempty"`
+
 	// OmitTokenInResponse, if true, prevents the JWT from being included in the JSON response body.
 	OmitTokenInResponse bool `json:"omit_token_in_response,omitempty"`
 
@@ -106,6 +110,7 @@ func (m *JWTIssuer) Provision(ctx caddy.Context) error {
 		zap.String("Default JWT lifetime", m.DefaultTokenLifetime.String()),
 		zap.String("Cookie name", m.CookieName),
 		zap.String("Cookie domain", m.CookieDomain),
+		zap.String("Cookie extension time", m.CookieExtensionTime.String()),
 		zap.Bool("Enable JWT cookie", m.EnableCookie),
 		zap.Bool("Omit token in response", m.OmitTokenInResponse),
 	)
@@ -258,13 +263,12 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// Log successful JWT issuance
 	logger.Info("Successfully issued JWT for user")
 
-	// Log JWT details
-	logJWTDetails(logger, tokenString, token)
+	// Log JWT details and get the expiration time
+	expirationTime := logJWTDetails(logger, tokenString, token)
 
 	// Check if the JWT should be sent as a cookie in the HTTP response as well
 	if m.EnableCookie {
-		// Set the JWT as a cookie
-		http.SetCookie(w, &http.Cookie{
+		cookie := &http.Cookie{
 			Name:     m.CookieName,
 			Value:    tokenString,
 			Path:     "/",
@@ -272,7 +276,15 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 			HttpOnly: true,
 			Secure:   r.TLS != nil, // Set Secure to true only if HTTPS is used
 			SameSite: http.SameSiteStrictMode,
-		})
+		}
+
+		// If cookie extension time is configured, add it to the JWT expiration
+		if m.CookieExtensionTime > 0 {
+			expirationTimeWithExtension := expirationTime.Add(m.CookieExtensionTime)
+			cookie.MaxAge = int(time.Until(expirationTimeWithExtension).Seconds())
+		}
+
+		http.SetCookie(w, cookie)
 	}
 
 	// Send the successful response

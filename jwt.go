@@ -49,7 +49,7 @@ func maskTokenForLog(token string) string {
 	return "[redacted]…" + token[len(token)-visibleTailChars:]
 }
 
-func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
+func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) time.Time {
 	logger.Debug("Encoded JWT", zap.String("jwt", maskTokenForLog(tokenString)))
 
 	// Log the JWT claims
@@ -78,6 +78,8 @@ func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
 	if len(metaClaims) > 0 {
 		logger.Info("Meta claims", zap.Any("meta_claims", metaClaims))
 	}
+
+	return expirationTime
 }
 
 // determineTokenLifetime calculates the token lifetime for a given user.

@@ -69,6 +69,12 @@ func (m *JWTIssuer) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return fmt.Errorf("invalid default_token_lifetime duration: %s", err)
 				}
 				m.DefaultTokenLifetime = duration
+			case "cookie_extension_time":
+				duration, err := time.ParseDuration(arg)
+				if err != nil {
+					return fmt.Errorf("invalid cookie_extension_time duration: %s", err)
+				}
+				m.CookieExtensionTime = duration
 			case "sign_key":
 				m.SignKey = arg
 			case "user_db_path":
