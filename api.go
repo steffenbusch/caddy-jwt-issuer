@@ -27,9 +27,9 @@ type apiResponse struct {
 // jsonResponse sends a generic JSON response with a message and optional token
 func jsonResponse(w http.ResponseWriter, statusCode int, response apiResponse) {
 	w.Header().Set("Content-Type", "application/json")
-	// Prevent storage in intermediaries
-	w.Header().Set("Cache-Control", "private")
-	w.Header().Set("Pragma", "private")
+	// Token-bearing responses must not be stored by browsers or intermediaries.
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
 }

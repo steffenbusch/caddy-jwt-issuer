@@ -16,6 +16,7 @@ package jwtissuer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -40,8 +41,16 @@ func predefinedClaims() map[string]bool {
 	}
 }
 
+func maskTokenForLog(token string) string {
+	const visibleTailChars = 24
+	if len(token) <= visibleTailChars {
+		return "[redacted]"
+	}
+	return "[redacted]…" + token[len(token)-visibleTailChars:]
+}
+
 func logJWTDetails(logger *zap.Logger, tokenString string, token *jwt.Token) {
-	logger.Debug("Encoded JWT", zap.String("jwt", tokenString))
+	logger.Debug("Encoded JWT", zap.String("jwt", maskTokenForLog(tokenString)))
 
 	// Log the JWT claims
 	claims := token.Claims.(jwt.MapClaims)
@@ -138,8 +147,11 @@ func (m *JWTIssuer) createJWT(user user, clientIP string, ctx context.Context) (
 		"ip":  clientIP, // Include client IP as a claim
 	}
 
-	// Fetch replacer from the request context
-	repl := ctx.Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	// Fetch replacer from the request context. Caddy normally provides this; fail closed if it is missing.
+	repl, ok := ctx.Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	if !ok || repl == nil {
+		return "", nil, fmt.Errorf("caddy replacer missing from request context")
+	}
 
 	// Add meta_claims to the JWT claims, excluding predefined claims
 	for key, value := range user.MetaClaims {

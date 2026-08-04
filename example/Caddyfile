@@ -130,12 +130,14 @@ auth.example.com {
 			import snippet_check_token_blocklist
 
 			# Note:
-			# On Logout, the JTI is added to the file jti_blocklist.txt
+			# On logout, the JTI and RFC3339 JWT expiration timestamp are added to jti_blocklist.txt.
+			# token_is_blocked also accepts older files with only one JTI per line.
+			# Expired entries are skipped in memory, but the matcher does not rewrite this file.
 			# The directive placeholder_dump requires the caddy-placeholder-dump plugin (https://github.com/steffenbusch/caddy-placeholder-dump)
 			# Attention: You should not let this file grow indefinitely. If you change the jwtauth sign_key, clear the content of this file.
 			placeholder_dump /logout.html {
 				file jti_blocklist.txt
-				content "{http.auth.user.jti}"
+				content "{http.auth.user.jti} {http.auth.user.exp}"
 			}
 
 			# Additonally, delete the cookie

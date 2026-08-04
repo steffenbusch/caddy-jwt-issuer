@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -67,6 +68,64 @@ func TestTokenIsBlocked_Match(t *testing.T) {
 	req := makeReqWithToken("notblocked")
 	if m.Match(req) {
 		t.Errorf("Expected token %q to NOT be blocked", "notblocked")
+	}
+}
+
+func TestTokenIsBlocked_LoadBlocklistWithOptionalExpiration(t *testing.T) {
+	futureExp := strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)
+	expiredExp := strconv.FormatInt(time.Now().Add(-time.Hour).Unix(), 10)
+	futureRFC3339Exp := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	expiredRFC3339Exp := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	blocklistFile := createTempBlocklistFile(t, []string{
+		"plain-token",
+		"future-token " + futureExp,
+		"expired-token " + expiredExp,
+		"future-rfc3339-token " + futureRFC3339Exp,
+		"expired-rfc3339-token " + expiredRFC3339Exp,
+		"malformed-token not-a-unix-time",
+	})
+	defer os.Remove(blocklistFile)
+
+	m := &TokenIsBlocked{
+		BlocklistFile: blocklistFile,
+		Placeholder:   "{token}",
+	}
+	m.logger = zaptest.NewLogger(t)
+	if err := m.loadBlocklist(); err != nil {
+		t.Fatalf("loadBlocklist failed: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		token   string
+		blocked bool
+	}{
+		{name: "plain token stays blocked", token: "plain-token", blocked: true},
+		{name: "future expiration stays blocked", token: "future-token", blocked: true},
+		{name: "expired token is skipped", token: "expired-token", blocked: false},
+		{name: "future RFC3339 expiration stays blocked", token: "future-rfc3339-token", blocked: true},
+		{name: "expired RFC3339 token is skipped", token: "expired-rfc3339-token", blocked: false},
+		{name: "malformed expiration fails closed", token: "malformed-token", blocked: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := m.Match(makeReqWithToken(tt.token)); got != tt.blocked {
+				t.Fatalf("Match() = %v, want %v", got, tt.blocked)
+			}
+		})
+	}
+}
+
+func TestTokenIsBlocked_MissingReplacerContext(t *testing.T) {
+	m := &TokenIsBlocked{
+		Placeholder: "{token}",
+	}
+	m.logger = zaptest.NewLogger(t)
+	req, _ := http.NewRequest("GET", "/", nil)
+
+	if m.Match(req) {
+		t.Fatal("Expected missing replacer context to not match")
 	}
 }
 

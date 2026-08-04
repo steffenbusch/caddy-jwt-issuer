@@ -34,6 +34,26 @@ func createTestUserDBFile(t *testing.T, users any) string {
 	return tmpfile.Name()
 }
 
+func TestMaskTokenForLog(t *testing.T) {
+	tests := []struct {
+		name  string
+		token string
+		want  string
+	}{
+		{name: "short token redacted", token: "short-token", want: "[redacted]"},
+		{name: "boundary length redacted", token: "123456789012345678901234", want: "[redacted]"},
+		{name: "long token keeps fixed tail", token: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", want: "[redacted]…CDEFGHIJKLMNOPQRSTUVWXYZ"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := maskTokenForLog(tt.token); got != tt.want {
+				t.Fatalf("maskTokenForLog() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestJWTIssuer_Provision_Validate(t *testing.T) {
 	// Create a dummy sign key (32 bytes, base64)
 	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
@@ -120,6 +140,12 @@ func TestJWTIssuer_ServeHTTP_Success(t *testing.T) {
 	}
 	if rr.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", rr.Code)
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Expected Cache-Control no-store, got %q", got)
+	}
+	if got := rr.Header().Get("Pragma"); got != "no-cache" {
+		t.Fatalf("Expected Pragma no-cache, got %q", got)
 	}
 
 	var resp apiResponse
@@ -219,6 +245,59 @@ func TestJWTIssuer_ServeHTTP_OmitToken(t *testing.T) {
 	}
 	if !found {
 		t.Error("JWT cookie not set, even though EnableCookie was true")
+	}
+}
+
+func TestJWTIssuer_ServeHTTP_MissingReplacerContext(t *testing.T) {
+	signKey := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
+	pw, _ := bcrypt.GenerateFromPassword([]byte("testpass"), 14)
+	users := map[string]any{
+		"bob": map[string]any{
+			"password": string(pw),
+			"audience": []string{"testaud"},
+		},
+	}
+	userDB := createTestUserDBFile(t, users)
+	defer os.Remove(userDB)
+
+	issuer := &JWTIssuer{
+		SignKey:              signKey,
+		UserDBPath:           userDB,
+		TokenIssuer:          "test-issuer",
+		DefaultTokenLifetime: 10 * time.Minute,
+	}
+	issuer.logger = zaptest.NewLogger(t)
+	var stubCaddyCtx caddy.Context
+	if err := issuer.Provision(stubCaddyCtx); err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+
+	body, _ := json.Marshal(credentials{
+		Username: "bob",
+		Password: "testpass",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/jwt", bytes.NewReader(body))
+	ctx := context.WithValue(req.Context(), caddyhttp.VarsCtxKey, map[string]any{
+		"client_ip": "10.1.2.3",
+	})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	if err := issuer.ServeHTTP(rr, req, nil); err != nil {
+		t.Fatalf("ServeHTTP error: %v", err)
+	}
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("Expected 500 Internal Server Error, got %d", rr.Code)
+	}
+}
+
+func TestGetClientIPFallbacks(t *testing.T) {
+	ctx := context.Background()
+	if got := getClientIP(ctx, "192.0.2.10:12345"); got != "192.0.2.10" {
+		t.Fatalf("Expected host from RemoteAddr, got %q", got)
+	}
+	if got := getClientIP(ctx, "not-a-host-port"); got != "not-a-host-port" {
+		t.Fatalf("Expected raw RemoteAddr fallback, got %q", got)
 	}
 }
 
