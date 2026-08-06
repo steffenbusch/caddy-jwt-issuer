@@ -166,8 +166,14 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 	if err != nil {
 		return err
 	}
-	// The file is closed explicitly below so close errors are handled before new state is published.
-	// Any future early-return path added while scanning must close the file as well.
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && m.logger != nil {
+			m.logger.Warn("Failed to close blocklist file",
+				zap.String("file", m.BlocklistFile),
+				zap.Error(closeErr),
+			)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	newMap := make(map[string]struct{})
@@ -209,10 +215,7 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 	}
 
 	if scanErr := scanner.Err(); scanErr != nil {
-		return errors.Join(scanErr, file.Close())
-	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("closing blocklist file failed: %w", err)
+		return scanErr
 	}
 
 	// Atomically store the new map. The blocklist file remains read-only from this matcher;
