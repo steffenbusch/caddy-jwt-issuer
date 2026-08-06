@@ -25,16 +25,16 @@ type apiResponse struct {
 }
 
 // jsonResponse sends a generic JSON response with a message and optional token
-func jsonResponse(w http.ResponseWriter, statusCode int, response apiResponse) {
+func jsonResponse(w http.ResponseWriter, statusCode int, response apiResponse) error {
 	w.Header().Set("Content-Type", "application/json")
 	// Token-bearing responses must not be stored by browsers or intermediaries.
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(response)
+	return json.NewEncoder(w).Encode(response)
 }
 
 // jsonError simplifies sending error messages in JSON format
-func jsonError(w http.ResponseWriter, statusCode int, message string) {
-	jsonResponse(w, statusCode, apiResponse{Message: message})
+func jsonError(w http.ResponseWriter, statusCode int, message string) error {
+	return jsonResponse(w, statusCode, apiResponse{Message: message})
 }

@@ -88,7 +88,9 @@ func (m *TokenIsBlocked) Provision(ctx caddy.Context) error {
 		if createErr != nil {
 			return fmt.Errorf("failed to create blocklist file: %w", createErr)
 		}
-		file.Close()
+		if closeErr := file.Close(); closeErr != nil {
+			return fmt.Errorf("failed to close newly created blocklist file: %w", closeErr)
+		}
 		m.logger.Info("Blocklist file created", zap.String("file", m.BlocklistFile))
 	}
 
@@ -153,12 +155,25 @@ func (m *TokenIsBlocked) Match(r *http.Request) bool {
 	return false
 }
 
+// MatchWithError implements caddyhttp.RequestMatcherWithError. Match is kept
+// for compatibility with Caddy versions that use the legacy matcher interface.
+func (m *TokenIsBlocked) MatchWithError(r *http.Request) (bool, error) {
+	return m.Match(r), nil
+}
+
 func (m *TokenIsBlocked) loadBlocklist() error {
 	file, err := os.Open(m.BlocklistFile)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && m.logger != nil {
+			m.logger.Warn("Failed to close blocklist file",
+				zap.String("file", m.BlocklistFile),
+				zap.Error(closeErr),
+			)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	newMap := make(map[string]struct{})
@@ -176,8 +191,8 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 
 		token := fields[0]
 		if len(fields) > 1 {
-			exp, err := parseBlocklistExpiration(fields[1])
-			if err != nil {
+			exp, parseErr := parseBlocklistExpiration(fields[1])
+			if parseErr != nil {
 				// Fail closed: a bad optional expiration must not accidentally unblock the token.
 				malformedExp++
 				if m.logger != nil {
@@ -185,7 +200,7 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 						zap.String("file", m.BlocklistFile),
 						zap.String("token", token),
 						zap.String("expiration", fields[1]),
-						zap.Error(err),
+						zap.Error(parseErr),
 					)
 				}
 			} else if !exp.After(now) {
@@ -199,8 +214,8 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 		newMap[token] = struct{}{}
 	}
 
-	if err := scanner.Err(); err != nil {
-		return err
+	if scanErr := scanner.Err(); scanErr != nil {
+		return scanErr
 	}
 
 	// Atomically store the new map. The blocklist file remains read-only from this matcher;
@@ -215,6 +230,7 @@ func (m *TokenIsBlocked) loadBlocklist() error {
 			zap.Int("malformed_expiration_entries", malformedExp),
 		)
 	}
+
 	return nil
 }
 
@@ -258,8 +274,8 @@ func (m *TokenIsBlocked) watchDirectoryLoop() {
 
 // Interface guards
 var (
-	_ caddy.Module             = (*TokenIsBlocked)(nil)
-	_ caddy.Provisioner        = (*TokenIsBlocked)(nil)
-	_ caddy.CleanerUpper       = (*TokenIsBlocked)(nil)
-	_ caddyhttp.RequestMatcher = (*TokenIsBlocked)(nil)
+	_ caddy.Module                      = (*TokenIsBlocked)(nil)
+	_ caddy.Provisioner                 = (*TokenIsBlocked)(nil)
+	_ caddy.CleanerUpper                = (*TokenIsBlocked)(nil)
+	_ caddyhttp.RequestMatcherWithError = (*TokenIsBlocked)(nil)
 )

@@ -7,12 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestValidateUserEntry(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
+	logger := zaptest.NewLogger(t)
 
 	jwtIssuer := &JWTIssuer{
 		logger:     logger,
@@ -70,8 +69,7 @@ func TestValidateUserEntry(t *testing.T) {
 }
 
 func TestLoadUsers(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
+	logger := zaptest.NewLogger(t)
 
 	jwtIssuer := &JWTIssuer{
 		logger:     logger,
@@ -95,16 +93,16 @@ func TestLoadUsers(t *testing.T) {
 		},
 	}
 
-	file, err := os.CreateTemp("", "users.json")
+	file, err := os.CreateTemp(t.TempDir(), "users.json")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(file.Name())
-
 	if err := json.NewEncoder(file).Encode(userData); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
-	file.Close()
+	if err := file.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
 
 	if err := jwtIssuer.loadUsers(file.Name()); err != nil {
 		t.Errorf("loadUsers() error = %v", err)

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -195,15 +196,13 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	var providedCredentials credentials
 	if err := json.NewDecoder(r.Body).Decode(&providedCredentials); err != nil {
 		logger.Error("Error decoding credentials", zap.Error(err))
-		jsonError(w, http.StatusBadRequest, "Invalid request payload.")
-		return nil
+		return jsonError(w, http.StatusBadRequest, "Invalid request payload.")
 	}
 
 	// Check if username was provided
 	if providedCredentials.Username == "" {
 		logger.Error("No username provided")
-		jsonError(w, http.StatusBadRequest, "Missing username value")
-		return nil
+		return jsonError(w, http.StatusBadRequest, "Missing username value")
 	}
 
 	// Retrieve the user entry from the in-memory user database
@@ -215,25 +214,25 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		// The cost of 14 is chosen to match the bcrypt cost used for real passwords
 		// This prevents attackers from knowing if a user does not exist based on the time taken
 		fakeHash := "$2a$14$BS8pSBcO76nFFFvzQuZuPe5nahDaA2QkXaUnUp4ND6k1ax4Ohi39m"
-		bcrypt.CompareHashAndPassword([]byte(fakeHash), []byte(providedCredentials.Password))
+		if err := bcrypt.CompareHashAndPassword([]byte(fakeHash), []byte(providedCredentials.Password)); err != nil &&
+			!errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			logger.Error("Dummy password comparison failed", zap.Error(err))
+		}
 		logger.Warn("Authentication failed due to incorrect username",
 			zap.String("username", providedCredentials.Username),
 		)
-		jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
-		return nil
+		return jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
 	}
 
 	// Validate the user entry for missing fields
 	if err := m.validateUserEntry(userEntry, providedCredentials.Username, clientIP); err != nil {
-		jsonError(w, http.StatusInternalServerError, "Internal server error")
-		return nil
+		return jsonError(w, http.StatusInternalServerError, "Internal server error")
 	}
 
 	// Verify the provided password against the stored hash
 	if bcrypt.CompareHashAndPassword([]byte(userEntry.Password), []byte(providedCredentials.Password)) != nil {
 		logger.Warn("Authentication failed due to wrong password", zap.String("username", providedCredentials.Username))
-		jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
-		return nil
+		return jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
 	}
 
 	// Check if token issuance is disabled for this user
@@ -242,8 +241,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 			zap.String("username", providedCredentials.Username),
 			zap.Time("disabled_after", *userEntry.TokenIssuanceDisabledAfter),
 		)
-		jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
-		return nil
+		return jsonError(w, http.StatusUnauthorized, "Unauthorized: Incorrect username or password")
 	}
 
 	// Create the JWT
@@ -251,8 +249,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	logger = logger.With(zap.String("username", userEntry.Username))
 	if err != nil {
 		logger.Error("Failed to create JWT", zap.Error(err))
-		jsonError(w, http.StatusInternalServerError, "Internal server error")
-		return nil
+		return jsonError(w, http.StatusInternalServerError, "Internal server error")
 	}
 
 	// Log successful JWT issuance
@@ -285,8 +282,7 @@ func (m *JWTIssuer) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		response.Token = tokenString
 	}
 
-	jsonResponse(w, http.StatusOK, response)
-	return nil
+	return jsonResponse(w, http.StatusOK, response)
 }
 
 // getClientIP retrieves the client IP address directly from the Caddy context.
