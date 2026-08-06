@@ -15,14 +15,18 @@ import (
 
 func createTempBlocklistFile(t *testing.T, tokens []string) string {
 	t.Helper()
-	tmpfile, err := os.CreateTemp("", "blocklist-*.txt")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "blocklist-*.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, token := range tokens {
-		_, _ = tmpfile.WriteString(token + "\n")
+		if _, err := tmpfile.WriteString(token + "\n"); err != nil {
+			t.Fatal(err)
+		}
 	}
-	tmpfile.Close()
+	if err := tmpfile.Close(); err != nil {
+		t.Fatal(err)
+	}
 	return tmpfile.Name()
 }
 
@@ -40,7 +44,6 @@ func makeReqWithToken(token string) *http.Request {
 func TestTokenIsBlocked_Match(t *testing.T) {
 	blockedTokens := []string{"blockedtoken1", "blockedtoken2"}
 	blocklistFile := createTempBlocklistFile(t, blockedTokens)
-	defer os.Remove(blocklistFile)
 
 	m := &TokenIsBlocked{
 		BlocklistFile: blocklistFile,
@@ -54,7 +57,11 @@ func TestTokenIsBlocked_Match(t *testing.T) {
 	if err := m.Provision(stubCaddyCtx); err != nil {
 		t.Fatalf("Provision failed: %v", err)
 	}
-	defer m.Cleanup()
+	t.Cleanup(func() {
+		if err := m.Cleanup(); err != nil {
+			t.Errorf("Cleanup failed: %v", err)
+		}
+	})
 
 	// Should match blocked tokens
 	for _, token := range blockedTokens {
@@ -84,7 +91,6 @@ func TestTokenIsBlocked_LoadBlocklistWithOptionalExpiration(t *testing.T) {
 		"expired-rfc3339-token " + expiredRFC3339Exp,
 		"malformed-token not-a-unix-time",
 	})
-	defer os.Remove(blocklistFile)
 
 	m := &TokenIsBlocked{
 		BlocklistFile: blocklistFile,
@@ -152,7 +158,6 @@ func TestTokenIsBlocked_UnmarshalCaddyfile(t *testing.T) {
 func TestTokenIsBlocked_FileWatcherReload(t *testing.T) {
 	blockedTokens := []string{"tokenA"}
 	blocklistFile := createTempBlocklistFile(t, blockedTokens)
-	defer os.Remove(blocklistFile)
 
 	m := &TokenIsBlocked{
 		BlocklistFile: blocklistFile,
@@ -163,7 +168,11 @@ func TestTokenIsBlocked_FileWatcherReload(t *testing.T) {
 	if err := m.Provision(stubCaddyCtx); err != nil {
 		t.Fatalf("Provision failed: %v", err)
 	}
-	defer m.Cleanup()
+	t.Cleanup(func() {
+		if err := m.Cleanup(); err != nil {
+			t.Errorf("Cleanup failed: %v", err)
+		}
+	})
 
 	// Initially blocked
 	if !m.Match(makeReqWithToken("tokenA")) {
@@ -179,8 +188,12 @@ func TestTokenIsBlocked_FileWatcherReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open blocklist file: %v", err)
 	}
-	_, _ = f.WriteString("tokenB\n")
-	f.Close()
+	if _, err := f.WriteString("tokenB\n"); err != nil {
+		t.Fatalf("Failed to append to blocklist file: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("Failed to close blocklist file: %v", err)
+	}
 
 	// Wait for watcher to reload (should be quick, but allow up to 500ms)
 	found := false

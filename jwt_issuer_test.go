@@ -22,13 +22,15 @@ import (
 
 func createTestUserDBFile(t *testing.T, users any) string {
 	t.Helper()
-	tmpfile, err := os.CreateTemp("", "userdb-*.json")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "userdb-*.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tmpfile.Close()
 	enc := json.NewEncoder(tmpfile)
 	if err := enc.Encode(users); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpfile.Close(); err != nil {
 		t.Fatal(err)
 	}
 	return tmpfile.Name()
@@ -66,7 +68,6 @@ func TestJWTIssuer_Provision_Validate(t *testing.T) {
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
-	defer os.Remove(userDB)
 
 	issuer := &JWTIssuer{
 		SignKey:              signKey,
@@ -99,7 +100,6 @@ func TestJWTIssuer_ServeHTTP_Success(t *testing.T) {
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
-	defer os.Remove(userDB)
 
 	issuer := &JWTIssuer{
 		SignKey:              signKey,
@@ -179,7 +179,6 @@ func TestJWTIssuer_ServeHTTP_OmitToken(t *testing.T) {
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
-	defer os.Remove(userDB)
 
 	issuer := &JWTIssuer{
 		SignKey:              signKey,
@@ -258,7 +257,6 @@ func TestJWTIssuer_ServeHTTP_MissingReplacerContext(t *testing.T) {
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
-	defer os.Remove(userDB)
 
 	issuer := &JWTIssuer{
 		SignKey:              signKey,
@@ -311,7 +309,6 @@ func TestJWTIssuer_ServeHTTP_BadPassword(t *testing.T) {
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
-	defer os.Remove(userDB)
 
 	issuer := &JWTIssuer{
 		SignKey:              signKey,
@@ -374,7 +371,6 @@ func TestJWTIssuer_ServeHTTP_TokenIssuanceDisabled(t *testing.T) {
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
-	defer os.Remove(userDB)
 
 	issuer := &JWTIssuer{
 		SignKey:              signKey,
@@ -452,7 +448,6 @@ func TestCaddyfileJWTIssuer(t *testing.T) {
 		},
 	}
 	userDB := createTestUserDBFile(t, users)
-	defer os.Remove(userDB)
 
 	caddyfile := `
 	{
@@ -483,8 +478,13 @@ func TestCaddyfileJWTIssuer(t *testing.T) {
 		t.Fatalf("Failed to create GET request: %v", err)
 	}
 	resp := tester.AssertResponseCode(req, 405)
-	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read GET response body: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Errorf("Failed to close GET response body: %v", err)
+	}
 	if !strings.Contains(string(body), "Method Not Allowed") {
 		t.Errorf("Expected method not allowed, got: %s", string(body))
 	}
@@ -496,8 +496,13 @@ func TestCaddyfileJWTIssuer(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp = tester.AssertResponseCode(req, 400)
-	body, _ = io.ReadAll(resp.Body)
-	resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read POST response body: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Errorf("Failed to close POST response body: %v", err)
+	}
 	if !strings.Contains(string(body), "Invalid request payload") {
 		t.Errorf("Expected invalid request payload, got: %s", string(body))
 	}
@@ -508,8 +513,13 @@ func TestCaddyfileJWTIssuer(t *testing.T) {
 		t.Fatalf("Failed to create GET request: %v", err)
 	}
 	resp = tester.AssertResponseCode(req, 200)
-	body, _ = io.ReadAll(resp.Body)
-	resp.Body.Close()
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read fallback response body: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Errorf("Failed to close fallback response body: %v", err)
+	}
 	if !strings.Contains(string(body), "ok") {
 		t.Errorf("Expected ok, got: %s", string(body))
 	}
